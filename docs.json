@@ -63,6 +63,7 @@
       {
         "group": "About this description",
         "pages": [
+          "specification-coverage",
           "openapi-3-2"
         ]
       }

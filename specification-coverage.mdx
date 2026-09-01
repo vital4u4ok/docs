@@ -1,0 +1,64 @@
+---
+title: "Specification coverage"
+description: "What this description exercises, feature by feature."
+---
+
+## By the numbers
+
+| | |
+| --- | --- |
+| Paths | 14, plus one reusable path item |
+| Operations | 21, of which 2 use non-standard HTTP methods and 2 are deprecated |
+| Security schemes | 12 |
+| Schemas | 32 |
+| Reusable parameters, headers, responses | 6, 8, 10 |
+
+## Deprecation
+
+Marked at every level the specification allows:
+
+- **Operations** — `DELETE /accounts/{accountId}` and `GET /fx/rates`, both returning
+  `Deprecation` and `Sunset` headers.
+- **Parameters** — the offset `page` parameter, superseded by `cursor`.
+- **Schema properties** — `Account.legacyCode`, present only on accounts migrated before 2019.
+- **Security schemes** — `apiKeyQuery` and `oauth2Implicit`. This level is new in OpenAPI 3.2.
+
+## Parameter serialization
+
+Every style, with both `explode` values.
+
+| Style | Parameter | Serializes as |
+| --- | --- | --- |
+| `form`, `explode: false` | `status` | `status=open,frozen` |
+| `form`, `explode: true` | `type` | `type=debit&type=fee` |
+| `spaceDelimited` | `productCodes` | `productCodes=CU-100%20SV-220` |
+| `pipeDelimited` | `branchCodes` | `branchCodes=a%7Cb` |
+| `deepObject` | `filter` | `filter[holderName]=...` |
+| `label` | `branchId` | `.EU-LON-01` |
+| `matrix` | `coords` | `;lat=51.5;long=-0.12` |
+| `simple` | header parameters | `a,b,c` |
+
+The `q` parameter sets `allowReserved: true`, so reserved characters pass through unencoded.
+
+## Request and response bodies
+
+- `application/json`, `application/hal+json` and `application/problem+json`
+- `application/merge-patch+json` and `application/json-patch+json` on the same operation
+- `multipart/form-data` with per-part `encoding`, including part headers
+- `application/jsonl` and `text/event-stream` for streamed responses
+- `application/pdf` and `text/csv` binary and text payloads
+- `application/xml` alongside JSON on the same operation
+
+## JSON Schema
+
+`oneOf`, `anyOf`, `allOf` and `not`; `if` / `then` / `else`; `const` and `enum`;
+`dependentRequired`; `patternProperties`, `propertyNames`, `minProperties`, `maxProperties`,
+`additionalProperties: false`; `prefixItems`, `contains`, `minContains`, `maxContains`,
+`uniqueItems`; `unevaluatedProperties`; `contentMediaType` and `contentEncoding`; `readOnly` and
+`writeOnly`; nullable types via `type: [string, 'null']`; a recursive `$ref` for the category
+tree; and `$defs` for the query filter grammar.
+
+<Tip>
+  Read `TransferRequest` first. Which creditor identifiers are required depends on the payment
+  rail, and it says so with `if` / `then` / `else` rather than three near-identical schemas.
+</Tip>
