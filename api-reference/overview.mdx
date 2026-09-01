@@ -1,0 +1,42 @@
+---
+title: "Pet Store API Overview"
+sidebarTitle: "Overview"
+description: "Introduction to the Pet Store API, including base URL, authentication, and the available pet management endpoints."
+---
+
+The Pet Store API lets you manage pets in your store. All requests use JSON and require bearer token authentication.
+
+## Base URL
+
+```text
+https://api.example.com/v1
+```
+
+## Authentication
+
+Pass your API token in the `Authorization` header on every request:
+
+```bash
+curl https://api.example.com/v1/pets \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card title="List pets" icon="list" href="/api-reference/list-pets">
+    Retrieve a paginated array of pets.
+  </Card>
+
+  <Card title="Create a pet" icon="plus" href="/api-reference/create-pet">
+    Add a new pet to the store.
+  </Card>
+
+  <Card title="Get a pet" icon="magnifying-glass" href="/api-reference/get-pet">
+    Fetch a single pet by ID.
+  </Card>
+
+  <Card title="Delete a pet" icon="trash" href="/api-reference/delete-pet">
+    Remove a pet from the store.
+  </Card>
+</CardGroup>
