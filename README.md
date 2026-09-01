@@ -1,16 +1,42 @@
-# Mintlify Starter Kit
+# Meridian Bank API docs
 
-Use the starter kit to get your docs deployed and ready to customize.
+Mintlify documentation site for a fictional banking API. The OpenAPI description behind it was
+written to exercise as much of the specification as one document reasonably can: every security
+scheme type, every parameter serialization style, deprecation at every level the specification
+allows, and the parts of JSON Schema 2020-12 that matter in practice.
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+Nothing here is a real service. Hostnames, IBANs and card numbers are fictional.
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
+## The two OpenAPI descriptions
 
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
+| Path | What it is |
+| --- | --- |
+| `openapi.yaml` | The source of truth. OpenAPI **3.2.0**. |
+| `openapi-3.1.yaml` | Generated from the above. What the API reference renders. |
+| `scripts/generate-openapi-3.1.py` | The 3.2 to 3.1 downgrade, and the `docs.json` nav refresh. |
+
+Mintlify renders OpenAPI 3.0 and 3.1 only. Edit the 3.2 file, then regenerate from the
+repository root:
+
+```bash
+python3 scripts/generate-openapi-3.1.py
+```
+
+That rewrites `openapi-3.1.yaml`, refreshes the endpoint list in `docs.json`, and verifies that
+the YAML it wrote reloads to the same document it built.
+
+`openapi.yaml` is listed in `.mintignore`. Mintlify validates every OpenAPI file it finds under
+the directory holding `docs.json`, whether or not a page references it, and it rejects 3.2.
+
+## Validation
+
+```bash
+mint validate        # build and navigation
+mint broken-links    # internal links
+```
+
+`openapi.yaml` validates against the official OpenAPI 3.2 meta-schema. `openapi-3.1.yaml` passes
+`redocly lint` with no errors.
 
 ## AI-assisted writing
 

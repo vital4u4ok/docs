@@ -5,3 +5,7 @@
 # Draft content
 drafts/
 *.draft.mdx
+
+# OpenAPI 3.2 source of truth. Mintlify renders 3.0 and 3.1 only, and validates
+# every OpenAPI file it finds, so it must not read this one.
+openapi.yaml

@@ -1,47 +1,93 @@
 ---
 title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+description: "Get a token and read your first account."
 ---
-
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
 
 ## Prerequisites
 
-Before you begin, you must have:
+Before you begin, you need:
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
+- A sandbox client id and secret from the developer portal.
+- A tool that can send HTTP requests, such as `curl`.
 
 ## Get started
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Pick an environment">
+    Use the sandbox while you build. It is seeded with data, and money never moves.
+
+    ```text
+    https://sandbox.api.meridian.example.com/v2
+    ```
+
+    Production is regional. The `tenant` server variable selects the deployment: `eu`, `uk` or
+    `us`.
+  </Step>
+
+  <Step title="Get an access token">
+    Back-office integrations use the client credentials flow. When you act for a customer, use
+    the authorization code flow instead.
 
     ```bash
-    npm install your-package
+    curl -X POST https://auth.meridian.example.com/oauth2/token \
+      -u "$CLIENT_ID:$CLIENT_SECRET" \
+      -d grant_type=client_credentials \
+      -d "scope=accounts:read transactions:read"
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Read an account">
+    Send a correlation id on every request. The API echoes it back on the response.
 
     ```bash
-    your-cli init
+    curl https://sandbox.api.meridian.example.com/v2/accounts \
+      -H "Authorization: Bearer $ACCESS_TOKEN" \
+      -H "X-Request-Id: $(uuidgen)"
     ```
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Move money">
+    Writes need an idempotency key. If you replay the same key within 24 hours, you get the
+    original outcome back instead of a second payment.
 
     ```bash
-    your-cli start
+    curl -X POST "https://sandbox.api.meridian.example.com/v2/accounts/$ACCOUNT_ID/transactions" \
+      -H "Authorization: Bearer $ACCESS_TOKEN" \
+      -H "Idempotency-Key: $(uuidgen)" \
+      -H "Content-Type: application/json" \
+      -d '{
+            "rail": "sepa",
+            "amount": { "amount": "120.00", "currency": "EUR" },
+            "creditor": { "name": "Olha Kovalchuk", "iban": "NL91MERI0417164300" },
+            "reference": "Invoice 2026-114"
+          }'
     ```
+
+    <Warning>
+      This operation also needs a detached HTTP message signature (RFC 9421). A valid token on
+      its own is refused.
+    </Warning>
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Handle errors
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+Every error is RFC 9457 problem details, served as `application/problem+json`. Validation
+failures add an `errors` array that points at the offending fields with a JSON Pointer.
+
+```json
+{
+  "type": "https://developers.meridian.example.com/problems/validation",
+  "title": "Request body failed validation",
+  "status": 422,
+  "detail": "2 fields are invalid.",
+  "instance": "/accounts",
+  "errors": [
+    {
+      "pointer": "/holder/dateOfBirth",
+      "code": "min_age",
+      "detail": "The account holder must be at least 18 years old."
+    }
+  ]
+}
+```

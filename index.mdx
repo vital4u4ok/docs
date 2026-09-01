@@ -1,0 +1,45 @@
+---
+title: "Meridian Bank API"
+description: "A fictional banking API, described in OpenAPI to exercise as much of the specification as one document reasonably can."
+---
+
+Meridian Bank is not a real bank. Every hostname, IBAN and card number here is fictional, and
+nothing you send from the playground reaches a real service.
+
+The description is the point. `openapi.yaml` covers as much of the OpenAPI Specification as a
+single readable document can: every security scheme type, every parameter serialization style,
+deprecation at every level the specification allows, and the parts of JSON Schema 2020-12 that
+matter in practice.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get a token and read your first account.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Twelve schemes, and how they combine.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference/overview">
+    All 21 operations, with a live playground.
+  </Card>
+  <Card title="OpenAPI 3.2" icon="code-branch" href="/openapi-3-2">
+    Why this repository carries two descriptions.
+  </Card>
+</CardGroup>
+
+## Two descriptions
+
+<Note>
+  The API reference renders `openapi-3.1.yaml`. The source of truth is `openapi.yaml`, which is
+  OpenAPI **3.2.0** and which Mintlify cannot render yet. See [OpenAPI 3.2](/openapi-3-2).
+</Note>
+
+## What the API covers
+
+| Resource | What you can do |
+| --- | --- |
+| Accounts | Open, read, amend and close accounts. Cursor pagination, conditional requests, merge and JSON patch. |
+| Transactions | Read postings, move money across four payment rails, stream an export. |
+| Payments | Read payment instructions and place or release holds on them. |
+| Cards | Read card instruments, as JSON or as XML. |
+| Documents | Upload KYC documents, one at a time or as a batch. |
+| Reference data | Look up ATMs and FX prices without authenticating. |

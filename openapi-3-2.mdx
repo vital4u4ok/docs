@@ -1,0 +1,64 @@
+---
+title: "OpenAPI 3.2"
+description: "Why this repository carries two descriptions, and what changes between them."
+---
+
+`openapi.yaml` is OpenAPI **3.2.0** and is the source of truth. Mintlify renders OpenAPI 3.0 and
+3.1 only, so the API reference renders `openapi-3.1.yaml`, which is generated from the 3.2
+original.
+
+<Info>
+  After you edit the 3.2 file, regenerate:
+
+  ```bash
+  python3 scripts/generate-openapi-3.1.py
+  ```
+
+  The script rewrites `openapi-3.1.yaml`, refreshes the endpoint list in `docs.json`, and checks
+  that the YAML it wrote reloads to the same document it built.
+</Info>
+
+`openapi.yaml` is listed in `.mintignore`. Without that, Mintlify validates it, finds a version
+it does not support, and fails the build.
+
+## What 3.2 adds, and what it becomes in 3.1
+
+| 3.2 feature | In `openapi.yaml` | In `openapi-3.1.yaml` |
+| --- | --- | --- |
+| `$self` | The document's own URI | Removed |
+| `Server.name` | `production`, `sandbox`, `local` | Removed |
+| Tag `parent`, `kind`, `summary` | Nested navigation and badge tags | Flattened to a plain tag list |
+| `query` method | `QUERY` on an account | `POST` on a `/postings/query` sub-path |
+| `additionalOperations` | `LOCK` and `UNLOCK` on a payment | `POST` and `DELETE` on a `/hold` sub-resource |
+| `in: querystring` | The whole query string as one parameter with a media type | Expanded to ordinary query parameters |
+| `Response.summary` | A short label beside the description | Folded into the description |
+| `itemSchema` | One item of a JSON Lines or SSE stream | An array schema, which is not the same thing |
+| `prefixEncoding`, `itemEncoding` | Ordered `multipart/mixed` parts | Named parts in `multipart/form-data` |
+| `Discriminator.defaultMapping` | Fallback variant for unmapped values | Removed |
+| `Example.dataValue`, `serializedValue` | Data form and wire form side by side | Collapsed onto `value` |
+| `components.mediaTypes` | One reusable problem-details media type | Inlined at every use |
+| `XML.nodeType` | `element`, `attribute`, `cdata` | `attribute: true` and `wrapped: true` |
+| `SecurityScheme.deprecated` | Marks two retired schemes | Folded into the description |
+| `oauth2MetadataUrl` | RFC 8414 metadata endpoint | Removed |
+| `deviceAuthorization` flow | Branch terminal login | The scheme is dropped entirely |
+
+## Losses worth knowing about
+
+<Warning>
+  Three of these are not faithful round trips.
+
+  `itemSchema` says the response is a sequence of these items, which is what a JSON Lines or SSE
+  body actually is. An array schema says the whole body is one JSON array. 3.1 cannot say the
+  former.
+
+  `serializedValue` is the only way to show a non-JSON example that is also schema-valid. Once it
+  collapses onto `value`, the XML card example is no longer checkable against its schema.
+
+  `defaultMapping` names the variant to use when the discriminating property is missing or
+  unrecognised. Dropping it leaves that case undefined.
+</Warning>
+
+## One 3.1 concession
+
+A `$ref` used as a Path Item is valid in 3.1, but Mintlify rejects it, so `components.pathItems`
+is inlined in the generated file. The 3.2 original keeps it.

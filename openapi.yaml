@@ -1,0 +1,2651 @@
+openapi: 3.2.0
+$self: https://raw.githubusercontent.com/vital4u4ok/openapi-showcase/main/openapi.yaml
+jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
+
+info:
+  title: Meridian Bank API
+  summary: Accounts, transactions, payments and cards for the Meridian core banking platform.
+  description: |
+    A deliberately feature-dense OpenAPI 3.2.0 description, written to exercise as much
+    of the specification as a single document reasonably can.
+
+    ## What is covered
+
+    - Every security scheme type: `oauth2` (all four flows, including the 3.2
+      `deviceAuthorization` flow), `http` (`basic`, `bearer`, `signature`), `apiKey`
+      (header, query, cookie), `mutualTLS` and `openIdConnect`.
+    - Security requirement combinations: global default, per-operation override,
+      AND (two schemes in one requirement), OR (several requirements) and opt-out
+      (`security: []`).
+    - Deprecation at every level the specification allows: operations, parameters,
+      schema properties and — new in 3.2 — security schemes.
+    - Parameter serialization: `form`, `simple`, `label`, `matrix`, `spaceDelimited`,
+      `pipeDelimited` and `deepObject`, with both `explode` values and `allowReserved`.
+    - OpenAPI 3.2 additions: `$self`, `Server.name`, tag hierarchies (`parent`, `kind`,
+      `summary`), the `query` HTTP method, `additionalOperations`, `in: querystring`,
+      `Response.summary`, `itemSchema` / `prefixEncoding` / `itemEncoding`,
+      `Discriminator.defaultMapping`, `Example.dataValue` / `serializedValue`,
+      `components.mediaTypes` and `XML.nodeType`.
+    - JSON Schema 2020-12: `oneOf` / `anyOf` / `allOf` / `not`, `if` / `then` / `else`,
+      `const`, `enum`, `dependentRequired`, `patternProperties`, `propertyNames`,
+      `prefixItems`, `contains` / `minContains`, `unevaluatedProperties`,
+      `contentMediaType` / `contentEncoding`, recursive `$ref` and `$defs`.
+
+    Nothing here is a real service. Hostnames, IBANs and card numbers are fictional.
+  termsOfService: https://meridian.example.com/terms
+  version: 2026.09.1
+  contact:
+    name: Meridian Developer Platform
+    url: https://developers.meridian.example.com
+    email: api@meridian.example.com
+  license:
+    name: Apache License 2.0
+    identifier: Apache-2.0
+
+externalDocs:
+  description: Developer portal
+  url: https://developers.meridian.example.com/guides
+
+servers:
+  - name: production
+    url: https://{tenant}.api.meridian.example.com/v2
+    description: Production. Requires mutual TLS on every payment-initiating call.
+    variables:
+      tenant:
+        description: Regional deployment the client is onboarded to.
+        default: eu
+        enum:
+          - eu
+          - uk
+          - us
+  - name: sandbox
+    url: https://sandbox.api.meridian.example.com/v2
+    description: Sandbox with seeded data. Money never moves.
+  - name: local
+    url: http://localhost:{port}/v2
+    description: Local mock server.
+    variables:
+      port:
+        default: '8080'
+
+tags:
+  - name: banking
+    summary: Banking
+    kind: nav
+    description: Core banking resources.
+  - name: accounts
+    summary: Accounts
+    parent: banking
+    description: Open, inspect, amend and close accounts.
+    externalDocs:
+      description: Account lifecycle guide
+      url: https://developers.meridian.example.com/guides/accounts
+  - name: transactions
+    summary: Transactions
+    parent: banking
+    description: Postings on an account.
+  - name: payments
+    summary: Payments
+    parent: banking
+    description: Payment instructions and their holds.
+  - name: cards
+    summary: Cards
+    parent: banking
+    description: Debit and credit card instruments.
+  - name: documents
+    summary: Documents
+    parent: banking
+    description: Statements, contracts and KYC uploads.
+  - name: streaming
+    summary: Streaming
+    kind: nav
+    description: Long-lived responses delivered as a sequence of items.
+  - name: reference
+    summary: Reference data
+    description: Public, unauthenticated lookup data.
+  - name: system
+    summary: System
+    description: Liveness and metadata endpoints.
+  - name: beta
+    summary: Beta
+    kind: badge
+    description: Subject to breaking change without a major version bump.
+  - name: sunset
+    summary: Deprecated
+    kind: badge
+    description: Scheduled for removal. Migrate before the sunset date.
+
+security:
+  - oauth2AuthCode:
+      - 'accounts:read'
+
+paths:
+  /accounts:
+    summary: Account collection
+    description: Everything that operates on the set of accounts a client can see.
+    get:
+      operationId: listAccounts
+      tags:
+        - accounts
+      summary: List accounts
+      description: |
+        Cursor-paginated. The `Link` header carries `next` and `prev` relations;
+        prefer it over constructing cursors by hand.
+      security:
+        - oauth2AuthCode:
+            - 'accounts:read'
+        - oauth2Implicit:
+            - 'accounts:read'
+        - bearerJwt: []
+        - apiKeyHeader: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          description: Return only accounts in these states. Repeat-free, comma-joined.
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            uniqueItems: true
+            minItems: 1
+            maxItems: 5
+            items:
+              $ref: '#/components/schemas/AccountStatus'
+          examples:
+            singleState:
+              summary: One state
+              dataValue:
+                - open
+              serializedValue: status=open
+            twoStates:
+              summary: 'Two states, comma-joined by `explode: false`'
+              dataValue:
+                - open
+                - frozen
+              serializedValue: status=open,frozen
+        - name: currency
+          in: query
+          description: Filter by settlement currency.
+          style: form
+          explode: true
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+        - name: productCodes
+          in: query
+          description: Space-delimited list of internal product codes.
+          style: spaceDelimited
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              pattern: '^[A-Z]{2}-[0-9]{3}$'
+          example:
+            - CU-100
+            - SV-220
+        - name: branchCodes
+          in: query
+          description: Pipe-delimited list of branch codes.
+          style: pipeDelimited
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: filter
+          in: query
+          description: Structured filter serialized as `filter[field]=value`.
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              openedAfter:
+                type: string
+                format: date
+              balanceAtLeast:
+                type: number
+                format: double
+                minimum: 0
+              holderName:
+                type: string
+          examples:
+            byHolder:
+              summary: Non-ASCII holder name
+              description: Shows why the serialized form matters for `deepObject`.
+              dataValue:
+                holderName: Ольга Ковальчук
+              serializedValue: filter%5BholderName%5D=%D0%9E%D0%BB%D1%8C%D0%B3%D0%B0%20%D0%9A%D0%BE%D0%B2%D0%B0%D0%BB%D1%8C%D1%87%D1%83%D0%BA
+        - name: q
+          in: query
+          description: Free-text search. Reserved characters are passed through unencoded.
+          allowReserved: true
+          schema:
+            type: string
+            maxLength: 128
+        - name: sort
+          in: query
+          description: Sort key. Prefix with `-` to reverse.
+          schema:
+            type: string
+            default: -openedAt
+            enum:
+              - openedAt
+              - -openedAt
+              - balance
+              - -balance
+        - name: page
+          in: query
+          deprecated: true
+          description: Offset paging. Superseded by `cursor` and ignored when `cursor` is present.
+          schema:
+            type: integer
+            minimum: 1
+        - name: mb_experiment
+          in: cookie
+          description: Opt into an experimental response shape.
+          schema:
+            type: string
+            enum:
+              - balances-v2
+      responses:
+        '200':
+          summary: A page of accounts
+          description: |
+            The page is never empty unless the whole result set is empty; an empty
+            page with a `next` link is not returned.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Link:
+              $ref: '#/components/headers/Link'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+            Set-Cookie:
+              description: Sticky routing cookie. Modeled with `content`, one value per line.
+              content:
+                text/plain:
+                  schema:
+                    type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountPage'
+              examples:
+                firstPage:
+                  summary: First page
+                  value:
+                    items:
+                      - id: 6f5b2f0e-0d5a-4a2f-9a41-2b8c1a7d4e10
+                        accountType: personal
+                        status: open
+                        iban: GB29MERI60161331926819
+                        currency: GBP
+                        balance:
+                          amount: '1043.28'
+                          currency: GBP
+                        openedAt: '2024-03-11T09:14:02Z'
+                    nextCursor: eyJvIjoxMDB9
+                empty:
+                  summary: No matches
+                  value:
+                    items: []
+                    nextCursor: null
+            application/hal+json:
+              schema:
+                $ref: '#/components/schemas/AccountPage'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '5XX':
+          $ref: '#/components/responses/ServerError'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: openAccount
+      tags:
+        - accounts
+      summary: Open an account
+      description: |
+        Requires both a client certificate and a client-credentials token: the two
+        schemes in the single requirement below are ANDed.
+      security:
+        - mutualTls: []
+          oauth2ClientCredentials:
+            - 'accounts:write'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        description: Discriminated by `accountType`.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountCreate'
+            examples:
+              personal:
+                summary: Personal current account
+                value:
+                  accountType: personal
+                  currency: GBP
+                  holder:
+                    givenName: Ada
+                    familyName: Lovelace
+                    dateOfBirth: '1990-12-10'
+                    email: ada@example.com
+                  overdraftLimit:
+                    amount: '250.00'
+                    currency: GBP
+              business:
+                summary: Business account
+                value:
+                  accountType: business
+                  currency: EUR
+                  company:
+                    legalName: Kvitka Holdings B.V.
+                    registrationNumber: NL-88213344
+                    countryOfIncorporation: NL
+                  signatories:
+                    - givenName: Mykola
+                      familyName: Petrenko
+                      email: mykola@example.com
+      responses:
+        '201':
+          summary: Account opened
+          description: The account is immediately usable for credits, and for debits once funded.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '202':
+          summary: Queued for manual review
+          description: Returned when the applicant is flagged by screening. Poll the `Location` target.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /accounts/{accountId}:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: getAccount
+      tags:
+        - accounts
+      summary: Fetch an account
+      security:
+        - oauth2AuthCode:
+            - 'accounts:read'
+        - openId: []
+        - apiKeyCookie: []
+      parameters:
+        - name: If-None-Match
+          in: header
+          description: Conditional fetch. Send the `ETag` from a previous response.
+          schema:
+            type: string
+          example: '"a3f1c9"'
+        - name: include
+          in: query
+          description: Expand related resources inline.
+          style: form
+          explode: false
+          schema:
+            type: array
+            uniqueItems: true
+            items:
+              type: string
+              enum:
+                - holder
+                - cards
+                - limits
+      responses:
+        '200':
+          summary: The account
+          description: Always reflects committed state; pending postings are excluded from `balance`.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Cache-Control:
+              description: Private caching directive.
+              schema:
+                type: string
+                default: private, max-age=30
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+    patch:
+      operationId: amendAccount
+      tags:
+        - accounts
+      summary: Amend an account
+      description: |
+        Two patch dialects are accepted. `application/merge-patch+json` treats an
+        explicit `null` as "clear this field"; `application/json-patch+json` uses
+        pointer operations.
+      security:
+        - oauth2AuthCode:
+            - 'accounts:write'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: If-Match
+          in: header
+          required: true
+          description: Optimistic concurrency. Rejected with `412` when stale.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/AccountMergePatch'
+            examples:
+              clearNickname:
+                summary: Clear a nullable field
+                value:
+                  nickname: null
+          application/json-patch+json:
+            schema:
+              $ref: '#/components/schemas/JsonPatchDocument'
+            examples:
+              replaceStatus:
+                summary: Freeze the account
+                value:
+                  - op: replace
+                    path: /status
+                    value: frozen
+      responses:
+        '200':
+          summary: Amended account
+          description: Reflects the patch. A fresh `ETag` is returned for the next conditional update.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          summary: Precondition failed
+          description: The `If-Match` value no longer matches the stored `ETag`.
+          content:
+            application/problem+json:
+              $ref: '#/components/mediaTypes/Problem'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Problem'
+    delete:
+      operationId: closeAccount
+      tags:
+        - accounts
+        - sunset
+      summary: Close an account
+      deprecated: true
+      description: |
+        Deprecated. Closing is now a state transition; send a merge patch with
+        `status: closing` instead. Removed on 2027-01-01.
+      security:
+        - mutualTls: []
+          oauth2AuthCode:
+            - 'accounts:write'
+      responses:
+        '204':
+          summary: Closed
+          description: No body. The account id remains resolvable for seven years.
+          headers:
+            Deprecation:
+              $ref: '#/components/headers/Deprecation'
+            Sunset:
+              $ref: '#/components/headers/Sunset'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '423':
+          summary: Locked
+          description: A legal hold prevents closure.
+          content:
+            application/problem+json:
+              $ref: '#/components/mediaTypes/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
+    query:
+      operationId: queryAccountPostings
+      tags:
+        - accounts
+        - transactions
+        - beta
+      summary: Query postings with a request body
+      description: |
+        Uses the `QUERY` HTTP method, new as a fixed field in OpenAPI 3.2. It is
+        safe and idempotent like `GET`, but carries a body, so a filter too large
+        for a URL does not have to be smuggled through `POST`.
+      security:
+        - oauth2AuthCode:
+            - 'transactions:read'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostingQuery'
+      responses:
+        '200':
+          summary: Matching postings
+          description: Ordered by `bookedAt`, honouring the `order` field of the query.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /accounts/{accountId}/transactions:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      operationId: listTransactions
+      tags:
+        - transactions
+      summary: List transactions
+      security:
+        - oauth2AuthCode:
+            - 'transactions:read'
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: bookedFrom
+          in: query
+          required: true
+          description: Inclusive lower bound on booking time.
+          schema:
+            type: string
+            format: date-time
+          example: '2026-01-01T00:00:00Z'
+        - name: bookedTo
+          in: query
+          description: Exclusive upper bound. Defaults to now.
+          schema:
+            type: string
+            format: date-time
+        - name: type
+          in: query
+          description: Restrict to these posting types.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/TransactionType'
+        - name: minAmount
+          in: query
+          description: Minimum absolute amount, in major units.
+          schema:
+            type: number
+            format: double
+            exclusiveMinimum: 0
+            multipleOf: 0.01
+      responses:
+        '200':
+          summary: A page of transactions
+          description: Newest first. Pending authorisations are not included until they book.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createTransfer
+      tags:
+        - transactions
+        - payments
+      summary: Initiate a transfer
+      description: |
+        Debits this account. Requires a detached HTTP message signature in addition
+        to a bearer token, so both schemes appear in one requirement.
+      security:
+        - httpSignature: []
+          oauth2AuthCode:
+            - 'payments:write'
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+            examples:
+              sepa:
+                summary: SEPA credit transfer
+                value:
+                  rail: sepa
+                  amount:
+                    amount: '120.00'
+                    currency: EUR
+                  creditor:
+                    name: Ольга Ковальчук
+                    iban: NL91MERI0417164300
+                  reference: Invoice 2026-114
+                  executionDate: '2026-09-02'
+              faster:
+                summary: UK Faster Payment
+                value:
+                  rail: faster-payments
+                  amount:
+                    amount: '75.50'
+                    currency: GBP
+                  creditor:
+                    name: Grace Hopper
+                    sortCode: '60-16-13'
+                    accountNumber: '31926819'
+      responses:
+        '201':
+          summary: Transfer accepted
+          description: The instruction was accepted for processing. Settlement happens asynchronously.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '402':
+          summary: Insufficient funds
+          description: The available balance, including any overdraft, cannot cover the debit.
+          content:
+            application/problem+json:
+              $ref: '#/components/mediaTypes/Problem'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /accounts/{accountId}/transactions/export:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      operationId: exportTransactions
+      tags:
+        - transactions
+        - streaming
+      summary: Export transactions as a stream
+      description: |
+        The JSON Lines variant is a sequential media type. Its Media Type Object
+        carries `itemSchema` rather than `schema`, because the payload as a whole
+        is not one JSON document.
+      security:
+        - oauth2AuthCode:
+            - 'transactions:read'
+      parameters:
+        - name: bookedFrom
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          summary: The export stream
+          description: Delivered with `Transfer-Encoding, chunked`; expect a long-lived response.
+          headers:
+            Content-Disposition:
+              description: Suggested filename for browser downloads.
+              schema:
+                type: string
+              example: attachment; filename="transactions-2026-01.jsonl"
+          content:
+            application/jsonl:
+              itemSchema:
+                $ref: '#/components/schemas/Transaction'
+            text/csv:
+              schema:
+                type: string
+                contentMediaType: text/csv
+              example: |
+                id,bookedAt,type,amount,currency
+                6f5b2f0e,2026-01-04T10:00:00Z,debit,-42.00,GBP
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /events:
+    get:
+      operationId: streamEvents
+      tags:
+        - streaming
+        - beta
+      summary: Subscribe to the account event stream
+      description: Server-sent events. Reconnect with `Last-Event-ID` to resume.
+      security:
+        - bearerJwt: []
+        - apiKeyCookie: []
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          description: Resume token from a previous stream.
+          schema:
+            type: string
+        - name: topics
+          in: query
+          required: true
+          style: form
+          explode: false
+          schema:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              enum:
+                - account.opened
+                - account.frozen
+                - transaction.booked
+                - card.blocked
+      responses:
+        '200':
+          summary: An open event stream
+          description: Stays open until the client disconnects. A comment line is sent every 15 seconds as a keep-alive.
+          content:
+            text/event-stream:
+              itemSchema:
+                $ref: '#/components/schemas/Event'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /payments/{paymentId}:
+    parameters:
+      - name: paymentId
+        in: path
+        required: true
+        description: Payment instruction identifier.
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getPayment
+      tags:
+        - payments
+      summary: Fetch a payment
+      security:
+        - oauth2AuthCode:
+            - 'payments:read'
+      responses:
+        '200':
+          summary: The payment
+          description: Includes the current status and, when the payment is held, the reason for the hold.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+    additionalOperations:
+      LOCK:
+        operationId: lockPayment
+        tags:
+          - payments
+          - beta
+        summary: Place a hold on a payment
+        description: |
+          Uses the WebDAV `LOCK` method, described here through 3.2's
+          `additionalOperations` map because it is not one of the fixed method fields.
+        security:
+          - oauth2AuthCode:
+              - 'payments:write'
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - timeoutSeconds
+                properties:
+                  timeoutSeconds:
+                    type: integer
+                    minimum: 30
+                    maximum: 86400
+                    default: 300
+                  reason:
+                    type: string
+                    maxLength: 200
+        responses:
+          '200':
+            summary: Hold placed
+            description: The payment will not settle until the hold is released or the timeout expires.
+            headers:
+              Lock-Token:
+                description: Opaque token required to release the hold.
+                schema:
+                  type: string
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/PaymentHold'
+          '409':
+            $ref: '#/components/responses/Conflict'
+          default:
+            $ref: '#/components/responses/Problem'
+      UNLOCK:
+        operationId: unlockPayment
+        tags:
+          - payments
+          - beta
+        summary: Release a hold
+        security:
+          - oauth2AuthCode:
+              - 'payments:write'
+        parameters:
+          - name: Lock-Token
+            in: header
+            required: true
+            description: Token returned by `LOCK`.
+            schema:
+              type: string
+        responses:
+          '204':
+            summary: Hold released
+            description: No body. Settlement resumes on the next cycle.
+          '404':
+            $ref: '#/components/responses/NotFound'
+          default:
+            $ref: '#/components/responses/Problem'
+
+  /reports/balances:
+    get:
+      operationId: getBalanceReport
+      tags:
+        - documents
+        - beta
+      summary: Balance report with a structured query string
+      description: |
+        The whole query string is one parameter, described with `in: querystring`
+        and a media type. That makes the encoding explicit instead of leaving it to
+        per-parameter `style` rules. A `querystring` parameter cannot be combined
+        with any `in: query` parameter in the same operation.
+      security:
+        - oauth2AuthCode:
+            - 'accounts:read'
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: query
+          in: querystring
+          required: true
+          description: Serialized report request. The parameter name is not used on the wire.
+          content:
+            application/x-www-form-urlencoded:
+              schema:
+                type: object
+                required:
+                  - asOf
+                  - accounts
+                properties:
+                  asOf:
+                    type: string
+                    format: date
+                  accounts:
+                    type: array
+                    items:
+                      type: string
+                      format: uuid
+                  groupBy:
+                    type: string
+                    enum:
+                      - currency
+                      - product
+                      - branch
+              examples:
+                twoAccounts:
+                  summary: Two accounts grouped by currency
+                  dataValue:
+                    asOf: '2026-08-31'
+                    accounts:
+                      - 6f5b2f0e-0d5a-4a2f-9a41-2b8c1a7d4e10
+                      - 8c1a7d4e-2b8c-4a2f-9a41-0d5a6f5b2f0e
+                    groupBy: currency
+                  serializedValue: asOf=2026-08-31&accounts=6f5b2f0e-0d5a-4a2f-9a41-2b8c1a7d4e10&accounts=8c1a7d4e-2b8c-4a2f-9a41-0d5a6f5b2f0e&groupBy=currency
+      responses:
+        '200':
+          summary: The report
+          description: Returned as JSON, or as a rendered PDF when the client asks for that media type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceReport'
+            application/pdf:
+              schema:
+                type: string
+                contentMediaType: application/pdf
+                contentEncoding: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /documents:
+    post:
+      operationId: uploadDocument
+      tags:
+        - documents
+      summary: Upload a KYC document
+      description: Multipart upload with per-part encoding declared through `encoding`.
+      security:
+        - oauth2AuthCode:
+            - 'documents:write'
+        - apiKeyHeader: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - metadata
+                - file
+              properties:
+                metadata:
+                  $ref: '#/components/schemas/DocumentMetadata'
+                file:
+                  type: string
+                  contentMediaType: application/pdf
+                  description: The document itself.
+                labels:
+                  type: array
+                  items:
+                    type: string
+            encoding:
+              metadata:
+                contentType: application/json
+                headers:
+                  X-Part-Checksum:
+                    description: SHA-256 of the part body, hex encoded.
+                    schema:
+                      type: string
+                      pattern: '^[0-9a-f]{64}$'
+              file:
+                contentType: application/pdf
+                headers:
+                  Content-Disposition:
+                    schema:
+                      type: string
+              labels:
+                contentType: text/plain
+                style: form
+                explode: true
+                allowReserved: false
+      responses:
+        '201':
+          summary: Document stored
+          description: The document is queued for automated verification; the outcome arrives as an event.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '413':
+          summary: Payload too large
+          description: The hard limit is 20 MiB per part.
+          content:
+            application/problem+json:
+              $ref: '#/components/mediaTypes/Problem'
+        '415':
+          summary: Unsupported media type
+          description: The part's `Content-Type` is not accepted for this document kind.
+          content:
+            application/problem+json:
+              $ref: '#/components/mediaTypes/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /documents/batch:
+    post:
+      operationId: uploadDocumentBatch
+      tags:
+        - documents
+        - beta
+      summary: Upload an ordered batch of documents
+      description: |
+        An ordered multipart body: the first part is a manifest, every later part is
+        a file. 3.2 describes that with `prefixEncoding` for the leading parts and
+        `itemEncoding` for the repeated tail. `encoding` must not be used alongside them.
+      security:
+        - oauth2AuthCode:
+            - 'documents:write'
+      requestBody:
+        required: true
+        content:
+          multipart/mixed:
+            schema:
+              type: array
+              minItems: 2
+              prefixItems:
+                - $ref: '#/components/schemas/BatchManifest'
+              items:
+                type: string
+                contentMediaType: application/pdf
+            prefixEncoding:
+              - contentType: application/json
+                headers:
+                  Content-Disposition:
+                    schema:
+                      type: string
+                    example: form-data; name="manifest"
+            itemEncoding:
+              contentType: application/pdf
+      responses:
+        '202':
+          summary: Batch accepted
+          description: Parts are processed asynchronously. Poll the batch or wait for the events.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchReceipt'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /cards/{cardId}:
+    parameters:
+      - name: cardId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getCard
+      tags:
+        - cards
+      summary: Fetch a card
+      description: |
+        Also served as XML for the legacy switch integration. The XML shape is
+        described with `nodeType`, which replaces the deprecated `attribute` and
+        `wrapped` booleans.
+      security:
+        - oauth2AuthCode:
+            - 'cards:read'
+        - oauth2Device:
+            - 'cards:read'
+        - basicAuth: []
+      responses:
+        '200':
+          summary: The card
+          description: The primary account number is always masked. Full PANs are never returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Card'
+              examples:
+                activeVisa:
+                  summary: An active Visa debit card
+                  description: |
+                    `dataValue` is the schema-valid data. `serializedValue` is what actually
+                    goes on the wire once the `xml` keywords in the schema are applied. Before
+                    3.2 there was only `value`, which could hold one or the other but not both.
+                  dataValue:
+                    id: 8c1a7d4e-2b8c-4a2f-9a41-0d5a6f5b2f0e
+                    network: visa
+                    pan: 424242******4242
+                    holder: Ada Lovelace
+                    statuses:
+                      - active
+                  serializedValue: |
+                    <card id="8c1a7d4e-2b8c-4a2f-9a41-0d5a6f5b2f0e" network="visa">
+                      <pan>424242******4242</pan>
+                      <cards:holder xmlns:cards="urn:meridian:cards">Ada Lovelace</cards:holder>
+                      <statuses>
+                        <status>active</status>
+                      </statuses>
+                    </card>
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /branches/{branchId}/atms/{coords}:
+    get:
+      operationId: findAtms
+      tags:
+        - reference
+      summary: Find ATMs near a point
+      description: |
+        Demonstrates the two path-only serialization styles: `label` renders as
+        `.EU-LON-01` and `matrix` as `;lat=51.5;long=-0.12`.
+      security: []
+      parameters:
+        - name: branchId
+          in: path
+          required: true
+          style: label
+          description: Branch code, serialized with a leading dot.
+          schema:
+            type: string
+            pattern: '^[A-Z]{2}-[A-Z]{3}-[0-9]{2}$'
+          examples:
+            london:
+              dataValue: EU-LON-01
+              serializedValue: .EU-LON-01
+        - name: coords
+          in: path
+          required: true
+          style: matrix
+          explode: true
+          description: Search centre.
+          schema:
+            type: object
+            required:
+              - lat
+              - long
+            properties:
+              lat:
+                type: number
+                format: double
+                minimum: -90
+                maximum: 90
+              long:
+                type: number
+                format: double
+                minimum: -180
+                maximum: 180
+          examples:
+            london:
+              dataValue:
+                lat: 51.5
+                long: -0.12
+              serializedValue: ;lat=51.5;long=-0.12
+        - name: radiusMetres
+          in: query
+          schema:
+            type: integer
+            default: 1000
+            minimum: 100
+            maximum: 25000
+      responses:
+        '200':
+          summary: Nearby ATMs
+          description: Ordered by distance from the supplied point, nearest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Atm'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /fx/rates:
+    get:
+      operationId: listFxRates
+      tags:
+        - reference
+        - sunset
+      summary: Indicative FX rates
+      deprecated: true
+      description: Deprecated in favour of `/fx/quotes`, which returns executable prices.
+      security:
+        - {}
+        - apiKeyQuery: []
+      parameters:
+        - name: base
+          in: query
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+      responses:
+        '200':
+          summary: Indicative rates
+          description: Indicative only. These prices must not be used to settle a trade.
+          headers:
+            Deprecation:
+              $ref: '#/components/headers/Deprecation'
+            Sunset:
+              $ref: '#/components/headers/Sunset'
+          content:
+            application/json:
+              schema:
+                type: object
+                propertyNames:
+                  pattern: '^[A-Z]{3}$'
+                additionalProperties:
+                  type: number
+                  format: double
+                  exclusiveMinimum: 0
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /fx/quotes:
+    get:
+      operationId: getFxQuote
+      tags:
+        - reference
+      summary: Executable FX quote
+      security: []
+      parameters:
+        - name: pair
+          in: query
+          required: true
+          description: Currency pair in `BASE/QUOTE` form.
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}/[A-Z]{3}$'
+          examples:
+            gbpeur:
+              dataValue: GBP/EUR
+              serializedValue: pair=GBP%2FEUR
+        - name: amount
+          in: query
+          schema:
+            type: string
+            pattern: '^[0-9]+\.[0-9]{2}$'
+      responses:
+        '200':
+          summary: A firm quote, valid for 30 seconds
+          description: Pass `quoteId` to a transfer to execute at this rate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FxQuote'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /ping:
+    $ref: '#/components/pathItems/Ping'
+
+components:
+  securitySchemes:
+    oauth2AuthCode:
+      type: oauth2
+      description: |
+        Interactive, user-present access. The default for anything that reads or
+        moves a customer's money.
+      oauth2MetadataUrl: https://auth.meridian.example.com/.well-known/oauth-authorization-server
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.meridian.example.com/oauth2/authorize
+          tokenUrl: https://auth.meridian.example.com/oauth2/token
+          refreshUrl: https://auth.meridian.example.com/oauth2/token
+          scopes:
+            'accounts:read': Read account details and balances.
+            'accounts:write': Open, amend and close accounts.
+            'transactions:read': Read postings and export them.
+            'payments:read': Read payment instructions.
+            'payments:write': Initiate payments and manage holds.
+            'cards:read': Read card details.
+            'documents:write': Upload documents.
+    oauth2ClientCredentials:
+      type: oauth2
+      description: Server-to-server access for back-office integrations. No user context.
+      oauth2MetadataUrl: https://auth.meridian.example.com/.well-known/oauth-authorization-server
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.meridian.example.com/oauth2/token
+          refreshUrl: https://auth.meridian.example.com/oauth2/token
+          scopes:
+            'accounts:write': Open accounts on behalf of an onboarded partner.
+            'transactions:read': Read postings across the partner's portfolio.
+    oauth2Device:
+      type: oauth2
+      description: |
+        For the branch card-reader terminals, which have no browser. Added as a
+        first-class flow in OpenAPI 3.2.
+      flows:
+        deviceAuthorization:
+          deviceAuthorizationUrl: https://auth.meridian.example.com/oauth2/device_authorization
+          tokenUrl: https://auth.meridian.example.com/oauth2/token
+          refreshUrl: https://auth.meridian.example.com/oauth2/token
+          scopes:
+            'cards:read': Read card details at the terminal.
+    oauth2Implicit:
+      type: oauth2
+      deprecated: true
+      description: |
+        Retired. Kept only so existing single-page clients keep rendering; use
+        `oauth2AuthCode` with PKCE instead. `deprecated` on a security scheme is new in 3.2.
+      flows:
+        implicit:
+          authorizationUrl: https://auth.meridian.example.com/oauth2/authorize
+          refreshUrl: https://auth.meridian.example.com/oauth2/token
+          scopes:
+            'accounts:read': Read account details and balances.
+    openId:
+      type: openIdConnect
+      description: Discovery-driven OIDC, for clients that want an id token alongside the access token.
+      openIdConnectUrl: https://auth.meridian.example.com/.well-known/openid-configuration
+    bearerJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A pre-minted JWT, for internal callers that already hold one.
+    basicAuth:
+      type: http
+      scheme: basic
+      description: Legacy terminal integration only. Never use over a non-TLS connection.
+    httpSignature:
+      type: http
+      scheme: signature
+      description: |
+        HTTP Message Signatures (RFC 9421). Required in addition to a token on any
+        request that moves money.
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: Partner key. Scoped to a tenant, rate limited per key.
+    apiKeyQuery:
+      type: apiKey
+      in: query
+      name: api_key
+      deprecated: true
+      description: Keys in the query string end up in access logs. Use `X-Api-Key`.
+    apiKeyCookie:
+      type: apiKey
+      in: cookie
+      name: mb_session
+      description: Session cookie issued by the online banking front end.
+    mutualTls:
+      type: mutualTLS
+      description: |
+        Client certificate issued by the Meridian partner CA. Presented at the TLS
+        layer, so it carries no wire-level parameters of its own.
+
+  parameters:
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      description: Account identifier.
+      schema:
+        type: string
+        format: uuid
+      example: 6f5b2f0e-0d5a-4a2f-9a41-2b8c1a7d4e10
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: true
+      description: Client-generated correlation id, echoed on every response.
+      schema:
+        type: string
+        format: uuid
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      description: Language for human-readable fields such as `Problem.detail`.
+      schema:
+        type: string
+        default: en-GB
+      examples:
+        ukrainian:
+          summary: Ukrainian, falling back to English
+          dataValue: uk-UA, en-GB;q=0.8
+          serializedValue: uk-UA, en-GB;q=0.8
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Replaying a request with the same key returns the original outcome instead
+        of creating a second one. Keys are retained for 24 hours.
+      schema:
+        type: string
+        format: uuid
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque page cursor taken from the previous response.
+      schema:
+        type: string
+        maxLength: 512
+    PageSize:
+      name: pageSize
+      in: query
+      description: Maximum items per page.
+      schema:
+        type: integer
+        format: int32
+        default: 25
+        minimum: 1
+        maximum: 200
+
+  headers:
+    ETag:
+      description: Entity tag for conditional requests.
+      schema:
+        type: string
+      example: '"a3f1c9"'
+    Location:
+      description: Absolute URL of the created or queued resource.
+      required: true
+      schema:
+        type: string
+        format: uri
+    RequestId:
+      description: Echo of the request's `X-Request-Id`.
+      schema:
+        type: string
+        format: uuid
+    RetryAfter:
+      description: Seconds to wait before polling or retrying.
+      schema:
+        type: integer
+        minimum: 1
+    RateLimitRemaining:
+      description: Requests left in the current window.
+      schema:
+        type: integer
+        minimum: 0
+    Link:
+      description: Web links for pagination, per RFC 8288.
+      schema:
+        type: string
+      example: <https://eu.api.meridian.example.com/v2/accounts?cursor=eyJvIjoxMDB9>; rel="next"
+    Deprecation:
+      description: Deprecation date of this operation, per RFC 9745.
+      schema:
+        type: string
+      example: '@1767225600'
+    Sunset:
+      description: Date after which the operation stops responding, per RFC 8594.
+      schema:
+        type: string
+      example: Fri, 01 Jan 2027 00:00:00 GMT
+
+  mediaTypes:
+    Problem:
+      schema:
+        $ref: '#/components/schemas/Problem'
+      examples:
+        validation:
+          summary: Field-level validation failure
+          value:
+            type: https://developers.meridian.example.com/problems/validation
+            title: Request body failed validation
+            status: 422
+            detail: 2 fields are invalid.
+            instance: /accounts
+            errors:
+              - pointer: /holder/dateOfBirth
+                code: min_age
+                detail: The account holder must be at least 18 years old.
+              - pointer: /currency
+                code: unsupported
+                detail: JPY is not offered on personal accounts.
+
+  responses:
+    NotModified:
+      summary: Not modified
+      description: The conditional request matched; no body is returned.
+      headers:
+        ETag:
+          $ref: '#/components/headers/ETag'
+    BadRequest:
+      summary: Malformed request
+      description: Syntactically invalid, or a parameter failed its schema.
+      content:
+        application/problem+json:
+          $ref: '#/components/mediaTypes/Problem'
+    Unauthorized:
+      summary: Missing or invalid credentials
+      description: No credentials were supplied, or the token has expired or been revoked.
+      headers:
+        WWW-Authenticate:
+          description: Challenge describing the accepted schemes.
+          schema:
+            type: string
+          example: Bearer realm="meridian", error="invalid_token"
+      content:
+        application/problem+json:
+          $ref: '#/components/mediaTypes/Problem'
+    Forbidden:
+      summary: Authenticated but not permitted
+      description: The token is valid but lacks the required scope, or the tenant does not own the resource.
+      content:
+        application/problem+json:
+          $ref: '#/components/mediaTypes/Problem'
+    NotFound:
+      summary: No such resource
+      description: The resource does not exist, or the caller's tenant cannot see it.
+      content:
+        application/problem+json:
+          $ref: '#/components/mediaTypes/Problem'
+    Conflict:
+      summary: Conflicting state
+      description: |
+        Also returned when an `Idempotency-Key` is replayed with a different body.
+      content:
+        application/problem+json:
+          $ref: '#/components/mediaTypes/Problem'
+    UnprocessableEntity:
+      summary: Semantically invalid
+      description: The body parsed and matched the schema, but broke a business rule.
+      content:
+        application/problem+json:
+          $ref: '#/components/mediaTypes/Problem'
+    TooManyRequests:
+      summary: Rate limited
+      description: The client exceeded its quota for the current window. Wait for the interval in `Retry-After`.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/RateLimitRemaining'
+      content:
+        application/problem+json:
+          $ref: '#/components/mediaTypes/Problem'
+    ServerError:
+      summary: Something broke on our side
+      description: Safe to retry with the same `Idempotency-Key`.
+      content:
+        application/problem+json:
+          $ref: '#/components/mediaTypes/Problem'
+    Problem:
+      summary: Unexpected error
+      description: The catch-all shape for any status not described explicitly.
+      content:
+        application/problem+json:
+          $ref: '#/components/mediaTypes/Problem'
+
+  pathItems:
+    Ping:
+      summary: Liveness probe
+      description: Reusable Path Item Object, referenced from `paths`.
+      get:
+        operationId: ping
+        tags:
+          - system
+        summary: Liveness probe
+        security: []
+        responses:
+          '200':
+            summary: The service is up
+            description: Returned only when the process can reach both its database and its message broker.
+            content:
+              text/plain:
+                schema:
+                  type: string
+                  const: pong
+          '429':
+            $ref: '#/components/responses/TooManyRequests'
+          '503':
+            summary: The service is draining
+            description: The instance is shutting down and no longer accepts work.
+            headers:
+              Retry-After:
+                $ref: '#/components/headers/RetryAfter'
+
+  schemas:
+    CurrencyCode:
+      title: Currency code
+      type: string
+      description: ISO 4217 alphabetic code, restricted to the currencies Meridian settles in.
+      enum:
+        - GBP
+        - EUR
+        - USD
+        - CHF
+        - PLN
+        - UAH
+      example: GBP
+
+    Money:
+      title: Money
+      type: object
+      description: A decimal amount carried as a string, so no precision is lost in JSON.
+      required:
+        - amount
+        - currency
+      additionalProperties: false
+      properties:
+        amount:
+          type: string
+          pattern: '^-?[0-9]{1,15}\.[0-9]{2}$'
+          description: Signed decimal in major units, always two fractional digits.
+          examples:
+            - '1043.28'
+            - '-42.00'
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+
+    AccountStatus:
+      title: Account status
+      type: string
+      description: |
+        Lifecycle state.
+
+        - `pending` — opened but not yet funded.
+        - `open` — fully operational.
+        - `frozen` — credits accepted, debits refused.
+        - `closing` — winding down; balance must reach zero.
+        - `closed` — terminal.
+      enum:
+        - pending
+        - open
+        - frozen
+        - closing
+        - closed
+
+    TransactionType:
+      title: Transaction type
+      type: string
+      enum:
+        - debit
+        - credit
+        - fee
+        - interest
+        - reversal
+        - chargeback
+
+    Person:
+      title: Person
+      type: object
+      required:
+        - givenName
+        - familyName
+        - email
+      properties:
+        givenName:
+          type: string
+          minLength: 1
+          maxLength: 70
+        familyName:
+          type: string
+          minLength: 1
+          maxLength: 70
+        dateOfBirth:
+          type: string
+          format: date
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        phone:
+          type:
+            - string
+            - 'null'
+          pattern: '^\+[1-9][0-9]{6,14}$'
+          description: E.164, or null when the customer has withheld it.
+        role:
+          type: string
+          enum:
+            - director
+            - signatory
+            - beneficial-owner
+
+    Company:
+      title: Company
+      type: object
+      required:
+        - legalName
+        - registrationNumber
+        - countryOfIncorporation
+      properties:
+        legalName:
+          type: string
+          maxLength: 200
+        registrationNumber:
+          type: string
+          pattern: '^[A-Z]{2}-[0-9]{6,12}$'
+        countryOfIncorporation:
+          type: string
+          description: ISO 3166-1 alpha-2.
+          pattern: '^[A-Z]{2}$'
+        website:
+          type: string
+          format: uri
+
+    Account:
+      title: Account
+      type: object
+      required:
+        - id
+        - accountType
+        - status
+        - currency
+        - balance
+        - openedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        accountType:
+          type: string
+          enum:
+            - personal
+            - business
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        nickname:
+          type:
+            - string
+            - 'null'
+          maxLength: 60
+          description: Customer-chosen label. `null` when never set or cleared.
+        iban:
+          type: string
+          pattern: '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$'
+          readOnly: true
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+        balance:
+          $ref: '#/components/schemas/Money'
+        availableBalance:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Balance plus any unused overdraft, minus pending holds.
+          readOnly: true
+        overdraftLimit:
+          $ref: '#/components/schemas/Money'
+        openedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        closedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          readOnly: true
+        legacyCode:
+          type: string
+          deprecated: true
+          description: Mainframe account key. Present only for accounts migrated before 2019.
+        holder:
+          $ref: '#/components/schemas/Person'
+        metadata:
+          type: object
+          description: Partner-defined tags. Keys are namespaced to keep them collision-free.
+          maxProperties: 20
+          propertyNames:
+            pattern: '^[a-z][a-z0-9]*\.[a-z0-9-]{1,40}$'
+          patternProperties:
+            '^tag\.':
+              type: string
+              maxLength: 100
+            '^flag\.':
+              type: boolean
+          additionalProperties: false
+      dependentRequired:
+        closedAt:
+          - status
+
+    AccountPage:
+      title: Account page
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+        nextCursor:
+          type:
+            - string
+            - 'null'
+          description: Cursor for the following page, or `null` on the last page.
+
+    AccountCreate:
+      title: Account creation request
+      description: |
+        Discriminated on `accountType`. `defaultMapping` is new in 3.2: it names the
+        schema to apply when the discriminating property is missing or carries a
+        value with no mapping, instead of leaving the outcome to the tool.
+      oneOf:
+        - $ref: '#/components/schemas/PersonalAccountCreate'
+        - $ref: '#/components/schemas/BusinessAccountCreate'
+        - $ref: '#/components/schemas/UnclassifiedAccountCreate'
+      discriminator:
+        propertyName: accountType
+        defaultMapping: '#/components/schemas/UnclassifiedAccountCreate'
+        mapping:
+          personal: '#/components/schemas/PersonalAccountCreate'
+          business: '#/components/schemas/BusinessAccountCreate'
+
+    AccountCreateBase:
+      type: object
+      required:
+        - accountType
+        - currency
+      properties:
+        accountType:
+          type: string
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+        nickname:
+          type: string
+          maxLength: 60
+        referralCode:
+          type: string
+          writeOnly: true
+          description: Accepted on creation, never returned.
+
+    PersonalAccountCreate:
+      title: Personal account
+      type: object
+      required:
+        - accountType
+        - holder
+      properties:
+        accountType:
+          const: personal
+        holder:
+          $ref: '#/components/schemas/Person'
+        overdraftLimit:
+          $ref: '#/components/schemas/Money'
+      allOf:
+        - $ref: '#/components/schemas/AccountCreateBase'
+      unevaluatedProperties: false
+
+    BusinessAccountCreate:
+      title: Business account
+      type: object
+      required:
+        - accountType
+        - company
+        - signatories
+      properties:
+        accountType:
+          const: business
+        company:
+          $ref: '#/components/schemas/Company'
+        signatories:
+          type: array
+          minItems: 1
+          maxItems: 10
+          uniqueItems: true
+          description: At least one signatory must be a director.
+          items:
+            $ref: '#/components/schemas/Person'
+          contains:
+            type: object
+            required:
+              - role
+            properties:
+              role:
+                const: director
+          minContains: 1
+          maxContains: 4
+      allOf:
+        - $ref: '#/components/schemas/AccountCreateBase'
+      unevaluatedProperties: false
+
+    UnclassifiedAccountCreate:
+      title: Unclassified account
+      description: |
+        Fallback for payloads whose `accountType` is absent or unrecognised. The
+        request is queued for manual classification rather than rejected outright.
+      type: object
+      required:
+        - accountType
+        - contactEmail
+      properties:
+        accountType:
+          type: string
+          description: Whatever the client sent, including values with no mapping.
+        contactEmail:
+          type: string
+          format: email
+        notes:
+          type: string
+          maxLength: 2000
+      allOf:
+        - $ref: '#/components/schemas/AccountCreateBase'
+
+    AccountMergePatch:
+      title: Account merge patch
+      description: |
+        RFC 7396 semantics. Every field is optional; an explicit `null` clears the
+        field rather than being ignored.
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        nickname:
+          type:
+            - string
+            - 'null'
+          maxLength: 60
+          not:
+            const: ''
+          description: Send `null` to clear. An empty string is rejected.
+        status:
+          type: string
+          enum:
+            - open
+            - frozen
+            - closing
+        overdraftLimit:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        metadata:
+          type: object
+          additionalProperties:
+            type:
+              - string
+              - boolean
+              - 'null'
+
+    JsonPatchDocument:
+      title: JSON Patch document
+      description: RFC 6902 operation list.
+      type: array
+      minItems: 1
+      items:
+        type: object
+        required:
+          - op
+          - path
+        properties:
+          op:
+            type: string
+            enum:
+              - add
+              - remove
+              - replace
+              - move
+              - copy
+              - test
+          path:
+            type: string
+            format: json-pointer
+          from:
+            type: string
+            format: json-pointer
+          value: {}
+        if:
+          properties:
+            op:
+              enum:
+                - move
+                - copy
+          required:
+            - op
+        then:
+          required:
+            - from
+        else:
+          not:
+            required:
+              - from
+
+    Transaction:
+      title: Transaction
+      allOf:
+        - type: object
+          required:
+            - id
+            - type
+            - amount
+            - bookedAt
+          properties:
+            id:
+              type: string
+              format: uuid
+              readOnly: true
+            type:
+              $ref: '#/components/schemas/TransactionType'
+            amount:
+              $ref: '#/components/schemas/Money'
+            bookedAt:
+              type: string
+              format: date-time
+            valueDate:
+              type: string
+              format: date
+            reference:
+              type: string
+              maxLength: 140
+            counterparty:
+              type: string
+            category:
+              $ref: '#/components/schemas/CategoryNode'
+        - type: object
+          properties:
+            reversalOf:
+              type: string
+              format: uuid
+              description: Set only on reversals.
+          if:
+            properties:
+              type:
+                const: reversal
+            required:
+              - type
+          then:
+            required:
+              - reversalOf
+          else:
+            not:
+              required:
+                - reversalOf
+      unevaluatedProperties: false
+
+    TransactionPage:
+      title: Transaction page
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+        nextCursor:
+          type:
+            - string
+            - 'null'
+        totals:
+          type: object
+          description: Sums over the whole result set, not just this page.
+          properties:
+            debits:
+              $ref: '#/components/schemas/Money'
+            credits:
+              $ref: '#/components/schemas/Money'
+
+    CategoryNode:
+      title: Category
+      description: A node in the spend-category tree. Recursive through `children`.
+      type: object
+      required:
+        - code
+        - label
+      properties:
+        code:
+          type: string
+          pattern: '^[a-z][a-z0-9-]{1,30}$'
+        label:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryNode'
+
+    TransferRequest:
+      title: Transfer request
+      description: |
+        The rail decides which creditor identifiers are required, expressed with
+        `if` / `then` / `else` rather than three near-identical schemas.
+      type: object
+      required:
+        - rail
+        - amount
+        - creditor
+      properties:
+        rail:
+          type: string
+          enum:
+            - sepa
+            - faster-payments
+            - swift
+            - internal
+        amount:
+          $ref: '#/components/schemas/Money'
+        creditor:
+          type: object
+          required:
+            - name
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 140
+            iban:
+              type: string
+              pattern: '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$'
+            bic:
+              type: string
+              pattern: '^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$'
+            sortCode:
+              type: string
+              pattern: '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+            accountNumber:
+              type: string
+              pattern: '^[0-9]{8}$'
+        reference:
+          type: string
+          maxLength: 140
+        executionDate:
+          type: string
+          format: date
+          description: Defaults to the next business day when omitted.
+        chargeBearer:
+          type: string
+          default: shared
+          enum:
+            - debtor
+            - creditor
+            - shared
+      if:
+        properties:
+          rail:
+            const: sepa
+        required:
+          - rail
+      then:
+        properties:
+          creditor:
+            required:
+              - iban
+      else:
+        properties:
+          creditor:
+            anyOf:
+              - required:
+                  - iban
+              - required:
+                  - sortCode
+                  - accountNumber
+
+    PostingQuery:
+      title: Posting query
+      description: Filter DSL sent in the body of a `QUERY` request.
+      type: object
+      required:
+        - filter
+      properties:
+        filter:
+          $ref: '#/components/schemas/PostingQuery/$defs/node'
+        limit:
+          type: integer
+          default: 100
+          minimum: 1
+          maximum: 1000
+        order:
+          type: string
+          default: desc
+          enum:
+            - asc
+            - desc
+      $defs:
+        node:
+          title: Filter node
+          description: Either a leaf comparison or a boolean combination of nodes.
+          anyOf:
+            - $ref: '#/components/schemas/PostingQuery/$defs/leaf'
+            - $ref: '#/components/schemas/PostingQuery/$defs/group'
+        leaf:
+          type: object
+          required:
+            - field
+            - op
+            - value
+          additionalProperties: false
+          properties:
+            field:
+              type: string
+              enum:
+                - amount
+                - bookedAt
+                - type
+                - counterparty
+                - reference
+            op:
+              type: string
+              enum:
+                - eq
+                - neq
+                - lt
+                - lte
+                - gt
+                - gte
+                - contains
+            value:
+              anyOf:
+                - type: string
+                - type: number
+                - type: boolean
+        group:
+          type: object
+          required:
+            - all
+          additionalProperties: false
+          properties:
+            all:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/PostingQuery/$defs/node'
+
+    Event:
+      title: Event
+      description: One item in the SSE stream, shaped as a CloudEvent.
+      type: object
+      required:
+        - specversion
+        - id
+        - source
+        - type
+        - time
+      properties:
+        specversion:
+          const: '1.0'
+        id:
+          type: string
+          format: uuid
+        source:
+          type: string
+          format: uri
+        type:
+          type: string
+          enum:
+            - account.opened
+            - account.frozen
+            - transaction.booked
+            - card.blocked
+        time:
+          type: string
+          format: date-time
+        subject:
+          type: string
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/Account'
+            - $ref: '#/components/schemas/Transaction'
+            - $ref: '#/components/schemas/Card'
+
+    Payment:
+      title: Payment
+      type: object
+      required:
+        - id
+        - status
+        - amount
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          type: string
+          enum:
+            - received
+            - held
+            - settled
+            - rejected
+        amount:
+          $ref: '#/components/schemas/Money'
+        settlementDelay:
+          type: string
+          format: duration
+          description: ISO 8601 duration before settlement is attempted.
+          example: PT2H
+        rejectionCode:
+          type:
+            - string
+            - 'null'
+
+    PaymentHold:
+      title: Payment hold
+      type: object
+      required:
+        - lockToken
+        - expiresAt
+      properties:
+        lockToken:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+
+    BalanceReport:
+      title: Balance report
+      type: object
+      required:
+        - asOf
+        - groups
+      properties:
+        asOf:
+          type: string
+          format: date
+        groups:
+          type: array
+          items:
+            type: object
+            required:
+              - key
+              - total
+            properties:
+              key:
+                type: string
+              total:
+                $ref: '#/components/schemas/Money'
+              accountCount:
+                type: integer
+                format: int64
+                minimum: 0
+
+    DocumentMetadata:
+      title: Document metadata
+      type: object
+      required:
+        - kind
+      properties:
+        kind:
+          type: string
+          enum:
+            - passport
+            - proof-of-address
+            - contract
+            - other
+        issuedAt:
+          type: string
+          format: date
+        expiresAt:
+          type: string
+          format: date
+        issuingCountry:
+          type: string
+          pattern: '^[A-Z]{2}$'
+      dependentRequired:
+        expiresAt:
+          - issuedAt
+
+    Document:
+      title: Document
+      type: object
+      required:
+        - id
+        - kind
+        - uploadedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        kind:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 20971520
+        thumbnail:
+          type: string
+          contentEncoding: base64
+          contentMediaType: image/png
+          description: Small PNG preview, base64 encoded.
+
+    BatchManifest:
+      title: Batch manifest
+      type: object
+      required:
+        - accountId
+        - parts
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        parts:
+          type: integer
+          minimum: 1
+          maximum: 50
+          description: Number of file parts that follow the manifest.
+
+    BatchReceipt:
+      title: Batch receipt
+      type: object
+      required:
+        - batchId
+        - accepted
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        accepted:
+          type: integer
+          minimum: 0
+        rejected:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              reason:
+                type: string
+
+    Card:
+      title: Card
+      type: object
+      xml:
+        name: card
+      required:
+        - id
+        - network
+        - pan
+        - statuses
+      properties:
+        id:
+          type: string
+          format: uuid
+          xml:
+            nodeType: attribute
+        network:
+          type: string
+          enum:
+            - visa
+            - mastercard
+            - amex
+          xml:
+            nodeType: attribute
+        pan:
+          type: string
+          description: Masked primary account number.
+          pattern: '^[0-9]{6}\*{6}[0-9]{4}$'
+          xml:
+            nodeType: element
+        holder:
+          type: string
+          xml:
+            nodeType: element
+            name: holder
+            namespace: urn:meridian:cards
+            prefix: cards
+        note:
+          type: string
+          description: Free-text note, emitted as a CDATA section in XML.
+          xml:
+            nodeType: cdata
+        expiry:
+          type: string
+          pattern: '^[0-9]{2}/[0-9]{2}$'
+        statuses:
+          type: array
+          xml:
+            nodeType: element
+            name: statuses
+          items:
+            type: string
+            enum:
+              - active
+              - blocked
+              - expired
+              - stolen
+            xml:
+              name: status
+
+    Atm:
+      title: ATM
+      type: object
+      required:
+        - id
+        - coordinates
+      properties:
+        id:
+          type: string
+        coordinates:
+          type: array
+          description: Longitude then latitude, as a fixed-length tuple.
+          minItems: 2
+          maxItems: 2
+          prefixItems:
+            - type: number
+              format: double
+              minimum: -180
+              maximum: 180
+            - type: number
+              format: double
+              minimum: -90
+              maximum: 90
+          items: false
+        services:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - withdrawal
+              - deposit
+              - cheque-deposit
+        host:
+          type: string
+          format: hostname
+        managementIp:
+          type: string
+          format: ipv4
+          writeOnly: true
+
+    FxQuote:
+      title: FX quote
+      type: object
+      required:
+        - pair
+        - rate
+        - expiresAt
+      properties:
+        pair:
+          type: string
+          pattern: '^[A-Z]{3}/[A-Z]{3}$'
+        rate:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+        expiresAt:
+          type: string
+          format: date-time
+        quoteId:
+          type: string
+          format: uuid
+
+    Problem:
+      title: Problem details
+      description: RFC 9457 problem details, extended with a machine-readable `errors` array.
+      externalDocs:
+        description: Error catalogue
+        url: https://developers.meridian.example.com/errors
+      type: object
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        traceId:
+          type: string
+          description: Correlation id for support requests.
+        errors:
+          type: array
+          description: Present on validation failures.
+          items:
+            type: object
+            required:
+              - pointer
+              - code
+            properties:
+              pointer:
+                type: string
+                format: json-pointer
+              code:
+                type: string
+              detail:
+                type: string

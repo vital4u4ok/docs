@@ -1,42 +1,49 @@
 ---
-title: "Pet Store API Overview"
+title: "API reference"
 sidebarTitle: "Overview"
-description: "Introduction to the Pet Store API, including base URL, authentication, and the available pet management endpoints."
+description: "Base URLs, conventions and the shape of every response."
 ---
 
-The Pet Store API lets you manage pets in your store. All requests use JSON and require bearer token authentication.
+The pages below are generated from `openapi-3.1.yaml`. Each one carries a playground, but no
+request reaches a real service.
 
 ## Base URL
 
 ```text
-https://api.example.com/v1
+https://sandbox.api.meridian.example.com/v2
 ```
 
-## Authentication
+Production is regional, and the `tenant` server variable selects the deployment: `eu`, `uk` or
+`us`.
 
-Pass your API token in the `Authorization` header on every request:
+## Conventions
 
-```bash
-curl https://api.example.com/v1/pets \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
+| Header | When you send it | What it does |
+| --- | --- | --- |
+| `X-Request-Id` | Every request | A correlation id you generate. The API echoes it back, and support asks for it. |
+| `Idempotency-Key` | Every write | Replaying a key within 24 hours returns the original outcome instead of a second write. |
+| `If-Match` | Patches | Send the `ETag` you read earlier. A stale value is refused with `412`. |
+| `If-None-Match` | Reads | Send the `ETag` you read earlier to get `304` instead of a body. |
 
-## Endpoints
+## Pagination
 
-<CardGroup cols={2}>
-  <Card title="List pets" icon="list" href="/api-reference/list-pets">
-    Retrieve a paginated array of pets.
-  </Card>
+Collections are cursor-paginated. Read `nextCursor` from the body, or follow the `next` relation
+in the `Link` header. Do not build cursors yourself.
 
-  <Card title="Create a pet" icon="plus" href="/api-reference/create-pet">
-    Add a new pet to the store.
-  </Card>
+The `page` parameter still exists on `GET /accounts`, but it is deprecated and ignored whenever
+`cursor` is present.
 
-  <Card title="Get a pet" icon="magnifying-glass" href="/api-reference/get-pet">
-    Fetch a single pet by ID.
-  </Card>
+## Errors
 
-  <Card title="Delete a pet" icon="trash" href="/api-reference/delete-pet">
-    Remove a pet from the store.
-  </Card>
-</CardGroup>
+Every error is RFC 9457 problem details, served as `application/problem+json`. Validation
+failures add an `errors` array that points at each offending field with a JSON Pointer.
+
+## Worth a look
+
+- `GET /accounts/{accountId}` answers `304` when your `ETag` still matches.
+- `PATCH /accounts/{accountId}` accepts both merge patch and JSON Patch on the same operation.
+- `GET /accounts/{accountId}/transactions/export` streams JSON Lines or CSV.
+- `POST /documents` declares a content type and headers for each multipart part.
+- `GET /cards/{cardId}` serves the same resource as JSON and as XML.
+- `GET /branches/{branchId}/atms/{coords}` uses the two path-only serialization styles,
+  `label` and `matrix`.

@@ -1,0 +1,81 @@
+---
+title: "Authentication"
+description: "Every security scheme type the specification defines, and how requirements combine."
+---
+
+The description declares twelve schemes. That is more than any real bank ships. The point is to
+cover every `type` and every OAuth2 flow in one place.
+
+## Schemes
+
+| Scheme | Type | Where you use it |
+| --- | --- | --- |
+| `oauth2AuthCode` | `oauth2`, authorization code | The default. Anything you do for a customer. |
+| `oauth2ClientCredentials` | `oauth2`, client credentials | Back-office integrations, with no user present. |
+| `oauth2Device` | `oauth2`, device authorization | Branch card terminals, which have no browser. |
+| `oauth2Implicit` | `oauth2`, implicit | Retired. Declared only so old clients still render. |
+| `openId` | `openIdConnect` | When you want an id token alongside the access token. |
+| `bearerJwt` | `http`, bearer, JWT | Internal callers that already hold a token. |
+| `basicAuth` | `http`, basic | Legacy terminal integration. |
+| `httpSignature` | `http`, signature | Required on top of a token wherever money moves. |
+| `apiKeyHeader` | `apiKey` in header | Partner keys, rate limited per key. |
+| `apiKeyQuery` | `apiKey` in query | Deprecated. Keys in a URL end up in access logs. |
+| `apiKeyCookie` | `apiKey` in cookie | The online banking front end. |
+| `mutualTls` | `mutualTLS` | A client certificate, presented at the TLS layer. |
+
+<Note>
+  The `oauth2Device` scheme, and the `deprecated` marker on `apiKeyQuery` and `oauth2Implicit`,
+  exist only in the 3.2 description. Both are dropped from the 3.1 file this reference renders.
+</Note>
+
+## How requirements combine
+
+A security requirement is a map. You must satisfy every scheme in a single map. Separate maps in
+the list are alternatives.
+
+<CodeGroup>
+
+```yaml AND
+# You need both: a client certificate and a token.
+security:
+  - mutualTls: []
+    oauth2ClientCredentials:
+      - 'accounts:write'
+```
+
+```yaml OR
+# Any one of these is enough.
+security:
+  - oauth2AuthCode:
+      - 'accounts:read'
+  - bearerJwt: []
+  - apiKeyHeader: []
+```
+
+```yaml Optional
+# The empty requirement makes authentication optional.
+security:
+  - {}
+  - apiKeyQuery: []
+```
+
+```yaml Opt out
+# No authentication at all, overriding the document default.
+security: []
+```
+
+</CodeGroup>
+
+## Scopes
+
+Scopes are split by resource, and by read against write.
+
+| Scope | What it grants |
+| --- | --- |
+| `accounts:read` | Read account details and balances. |
+| `accounts:write` | Open, amend and close accounts. |
+| `transactions:read` | Read postings and export them. |
+| `payments:read` | Read payment instructions. |
+| `payments:write` | Initiate payments and manage holds. |
+| `cards:read` | Read card details. |
+| `documents:write` | Upload documents. |
