@@ -277,21 +277,34 @@ def inline_path_items(doc):
 
 
 def drop_device_flow(doc):
+    """deviceAuthorization is a 3.2 flow. Remove it, and any scheme left with no flows."""
     schemes = doc["components"]["securitySchemes"]
-    schemes.pop("oauth2Device", None)
+    dropped = set()
+    for name, scheme in list(schemes.items()):
+        flows = scheme.get("flows")
+        if not isinstance(flows, dict) or "deviceAuthorization" not in flows:
+            continue
+        flows.pop("deviceAuthorization")
+        if not flows:
+            del schemes[name]
+            dropped.add(name)
+    if not dropped:
+        return
+
+    def filter_requirements(container):
+        if "security" not in container:
+            return
+        container["security"] = [
+            requirement for requirement in container["security"] if not dropped & set(requirement)
+        ]
+
+    filter_requirements(doc)
     for path_item in doc["paths"].values():
         if not isinstance(path_item, dict):
             continue
         for method, operation in path_item.items():
-            if method not in FIXED_METHODS or not isinstance(operation, dict):
-                continue
-            if "security" not in operation:
-                continue
-            operation["security"] = [
-                requirement
-                for requirement in operation["security"]
-                if "oauth2Device" not in requirement
-            ]
+            if method in FIXED_METHODS and isinstance(operation, dict):
+                filter_requirements(operation)
 
 
 def fold_scheme_deprecation(doc):

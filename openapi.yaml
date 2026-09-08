@@ -11,16 +11,19 @@ info:
 
     ## What is covered
 
-    - Every security scheme type: `oauth2` (all four flows, including the 3.2
-      `deviceAuthorization` flow), `http` (`basic`, `bearer`, `signature`), `apiKey`
-      (header, query, cookie), `mutualTLS` and `openIdConnect`.
+    - Every security scheme type: `oauth2` (all five flows, including `password` and the
+      3.2 `deviceAuthorization` flow, and one scheme that declares all five at once),
+      `http` (`basic`, `bearer`, `digest`, `signature`), `apiKey` (header, query, cookie),
+      `mutualTLS` and `openIdConnect`.
     - Security requirement combinations: global default, per-operation override,
       AND (two schemes in one requirement), OR (several requirements) and opt-out
       (`security: []`).
     - Deprecation at every level the specification allows: operations, parameters,
       schema properties and — new in 3.2 — security schemes.
     - Parameter serialization: `form`, `simple`, `label`, `matrix`, `spaceDelimited`,
-      `pipeDelimited` and `deepObject`, with both `explode` values and `allowReserved`.
+      `pipeDelimited` and `deepObject`, every style in every location it is allowed,
+      with both `explode` values, `allowReserved`, `allowEmptyValue`, and a parameter
+      described with `content` instead of `schema`.
     - OpenAPI 3.2 additions: `$self`, `Server.name`, tag hierarchies (`parent`, `kind`,
       `summary`), the `query` HTTP method, `additionalOperations`, `in: querystring`,
       `Response.summary`, `itemSchema` / `prefixEncoding` / `itemEncoding`,
@@ -110,6 +113,12 @@ tags:
     summary: Beta
     kind: badge
     description: Subject to breaking change without a major version bump.
+  - name: diagnostics
+    summary: Diagnostics
+    description: |
+      Endpoints that exist to exercise this description rather than to move money.
+      Every parameter style, media type and security scheme that the rest of the API
+      does not already use is reachable from here.
   - name: sunset
     summary: Deprecated
     kind: badge
@@ -1870,6 +1879,568 @@ paths:
         default:
           $ref: '#/components/responses/Problem'
 
+  /diagnostics/echo:
+    get:
+      operationId: echoParameters
+      tags:
+        - diagnostics
+      summary: Echo every parameter back
+      description: |
+        Every remaining parameter combination the specification allows, in one place:
+        `form`, `spaceDelimited`, `pipeDelimited` and `deepObject` in the query,
+        `simple` in a header, `form` in a cookie, each with both `explode` values, plus
+        `allowEmptyValue` and a parameter described with `content` instead of `schema`.
+
+        The response reports what the server parsed, so a client can check its own
+        serializer against the description.
+      security:
+        - digestAuth: []
+      parameters:
+        - name: tags
+          in: query
+          style: form
+          explode: true
+          description: Array, exploded. The key repeats once per item.
+          schema:
+            type: array
+            items:
+              type: string
+          examples:
+            two:
+              dataValue:
+                - retail
+                - eu
+              serializedValue: tags=retail&tags=eu
+        - name: filters
+          in: query
+          style: form
+          explode: false
+          description: Array, not exploded. One key, comma separated.
+          schema:
+            type: array
+            items:
+              type: string
+          examples:
+            two:
+              dataValue:
+                - open
+                - frozen
+              serializedValue: filters=open,frozen
+        - name: flat
+          in: query
+          style: form
+          explode: false
+          description: Object, not exploded. Keys and values alternate in one value.
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+              currency:
+                type: string
+          examples:
+            pair:
+              dataValue:
+                status: open
+                currency: GBP
+              serializedValue: flat=status,open,currency,GBP
+        - name: bbox
+          in: query
+          style: spaceDelimited
+          explode: false
+          description: Space delimited, not exploded. The spaces are percent encoded.
+          schema:
+            type: array
+            items:
+              type: number
+              format: double
+          examples:
+            box:
+              dataValue:
+                - -0.51
+                - 51.28
+                - 0.33
+                - 51.69
+              serializedValue: bbox=-0.51%2051.28%200.33%2051.69
+        - name: bboxExploded
+          in: query
+          style: spaceDelimited
+          explode: true
+          description: |
+            Space delimited, exploded. Exploding removes the delimiter entirely, so this
+            is indistinguishable from `form` with `explode: true`.
+          schema:
+            type: array
+            items:
+              type: number
+              format: double
+          examples:
+            box:
+              dataValue:
+                - -0.51
+                - 51.28
+              serializedValue: bboxExploded=-0.51&bboxExploded=51.28
+        - name: codes
+          in: query
+          style: pipeDelimited
+          explode: false
+          description: Pipe delimited, not exploded.
+          schema:
+            type: array
+            items:
+              type: string
+          examples:
+            two:
+              dataValue:
+                - GB
+                - IE
+              serializedValue: codes=GB%7CIE
+        - name: codesExploded
+          in: query
+          style: pipeDelimited
+          explode: true
+          description: Pipe delimited, exploded. As above, the delimiter disappears.
+          schema:
+            type: array
+            items:
+              type: string
+          examples:
+            two:
+              dataValue:
+                - GB
+                - IE
+              serializedValue: codesExploded=GB&codesExploded=IE
+        - name: where
+          in: query
+          style: deepObject
+          explode: true
+          description: Nested object, one bracketed key per property.
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+              minBalance:
+                type: number
+                format: double
+          examples:
+            pair:
+              dataValue:
+                status: open
+                minBalance: 100
+              serializedValue: where[status]=open&where[minBalance]=100
+        - name: verbose
+          in: query
+          allowEmptyValue: true
+          description: |
+            Flag parameter. `allowEmptyValue` lets the key appear with no value at all.
+            The specification marks this field as not recommended, and it is here to be
+            rendered rather than copied.
+          schema:
+            type: boolean
+            default: false
+          examples:
+            bare:
+              dataValue: true
+              serializedValue: verbose
+        - name: selector
+          in: query
+          description: |
+            A structured value carried in a single parameter, described with `content`
+            rather than `schema`, so the media type says how it is encoded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - fields
+                properties:
+                  fields:
+                    type: array
+                    items:
+                      type: string
+                  depth:
+                    type: integer
+                    minimum: 1
+                    maximum: 5
+              examples:
+                twoFields:
+                  dataValue:
+                    fields:
+                      - id
+                      - balance
+                    depth: 2
+                  serializedValue: selector=%7B%22fields%22%3A%5B%22id%22%2C%22balance%22%5D%2C%22depth%22%3A2%7D
+        - name: X-Accept-Features
+          in: header
+          style: simple
+          explode: false
+          description: Array in a header. `simple` is the only style headers allow.
+          schema:
+            type: array
+            items:
+              type: string
+          examples:
+            two:
+              dataValue:
+                - hal
+                - problem-json
+              serializedValue: hal,problem-json
+        - name: X-Trace-Options
+          in: header
+          style: simple
+          explode: true
+          description: |
+            Object in a header. Exploding turns the flat `k,v,k,v` list into `k=v` pairs.
+          schema:
+            type: object
+            properties:
+              sampled:
+                type: boolean
+              rate:
+                type: number
+                format: double
+          examples:
+            pair:
+              dataValue:
+                sampled: true
+                rate: 0.1
+              serializedValue: sampled=true,rate=0.1
+        - name: prefs
+          in: cookie
+          style: form
+          explode: true
+          description: |
+            Object in a cookie. With `explode: true` each property becomes its own
+            cookie, which is why the specification warns the behaviour is not fully
+            defined for cookies.
+          schema:
+            type: object
+            properties:
+              theme:
+                type: string
+              density:
+                type: string
+          examples:
+            pair:
+              dataValue:
+                theme: dark
+                density: compact
+              serializedValue: theme=dark; density=compact
+        - name: session_flags
+          in: cookie
+          style: form
+          explode: false
+          description: Array in a cookie, comma separated inside one cookie value.
+          schema:
+            type: array
+            items:
+              type: string
+          examples:
+            two:
+              dataValue:
+                - beta
+                - internal
+              serializedValue: session_flags=beta,internal
+      responses:
+        '200':
+          summary: What the server parsed
+          description: |
+            Each entry reports the raw value as it arrived and the value after the
+            declared style was applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticEcho'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /diagnostics/path/{simpleObject}/{labelArray}/{matrixArray}:
+    get:
+      operationId: echoPathStyles
+      tags:
+        - diagnostics
+      summary: Echo the path serialization styles
+      description: |
+        The three path-capable styles with the `explode` values the rest of this
+        description does not already use. Together with
+        `GET /branches/{branchId}/atms/{coords}` every path style and `explode`
+        combination is covered.
+
+        A request looks like
+        `/diagnostics/path/kind=card,id=42/.eu.lon.01/;matrixArray=1,2,3`.
+      security:
+        - oauth2Password:
+            - 'accounts:read'
+      parameters:
+        - name: simpleObject
+          in: path
+          required: true
+          style: simple
+          explode: true
+          description: Object with `simple`, exploded into `k=v` pairs.
+          schema:
+            type: object
+            required:
+              - kind
+              - id
+            properties:
+              kind:
+                type: string
+              id:
+                type: string
+          examples:
+            card:
+              dataValue:
+                kind: card
+                id: '42'
+              serializedValue: kind=card,id=42
+        - name: labelArray
+          in: path
+          required: true
+          style: label
+          explode: true
+          description: Array with `label`, exploded so every item gets its own dot.
+          schema:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          examples:
+            three:
+              dataValue:
+                - eu
+                - lon
+                - '01'
+              serializedValue: .eu.lon.01
+        - name: matrixArray
+          in: path
+          required: true
+          style: matrix
+          explode: false
+          description: Array with `matrix`, not exploded, so the name appears once.
+          schema:
+            type: array
+            minItems: 1
+            items:
+              type: integer
+          examples:
+            three:
+              dataValue:
+                - 1
+                - 2
+                - 3
+              serializedValue: ;matrixArray=1,2,3
+      responses:
+        '200':
+          summary: What the server parsed
+          description: The three values after the declared styles were applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticEcho'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        default:
+          $ref: '#/components/responses/Problem'
+
+  /diagnostics/payload:
+    post:
+      operationId: postDiagnosticPayload
+      tags:
+        - diagnostics
+      summary: Accept a payload in any media type
+      description: |
+        Thirteen request media types on one operation, including a media type range
+        (`image/*`), a catch-all (`*/*`) with an empty schema, a sequential type
+        described with `itemSchema`, and `multipart/related` with per-part `encoding`.
+      security:
+        - oauth2AllFlows:
+            - 'diagnostics:write'
+      requestBody:
+        required: true
+        description: Whatever the caller has to hand.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiagnosticEnvelope'
+            examples:
+              minimal:
+                $ref: '#/components/examples/DiagnosticMinimal'
+              full:
+                $ref: '#/components/examples/DiagnosticFull'
+          application/vnd.api+json:
+            schema:
+              type: object
+              description: JSON:API document wrapping the same envelope.
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - type
+                    - attributes
+                  properties:
+                    type:
+                      type: string
+                      const: diagnostic
+                    id:
+                      type: string
+                    attributes:
+                      $ref: '#/components/schemas/DiagnosticEnvelope'
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/DiagnosticEnvelope'
+          application/x-ndjson:
+            itemSchema:
+              $ref: '#/components/schemas/DiagnosticEvent'
+          text/html:
+            schema:
+              type: string
+              contentMediaType: text/html
+              description: Rendered report, stored verbatim.
+          text/markdown:
+            schema:
+              type: string
+              description: The same report as source.
+            example: |
+              # Diagnostic report
+
+              - captured: 2026-09-08T11:04:19Z
+              - severity: info
+          text/csv:
+            schema:
+              type: string
+              description: One row per event, header row required.
+            example: |
+              at,severity,message
+              2026-09-08T11:04:19Z,info,switch reachable
+          image/png:
+            schema:
+              type: string
+              contentMediaType: image/png
+              description: Screenshot from the terminal.
+          image/*:
+            schema:
+              type: string
+              contentMediaType: image/*
+              description: |
+                A media type range. Any image the terminal can produce is accepted; the
+                concrete type arrives in `Content-Type`.
+          application/zip:
+            schema:
+              type: string
+              contentMediaType: application/zip
+              description: Archive of several reports.
+          application/cbor:
+            schema:
+              type: string
+              contentMediaType: application/cbor
+              description: The envelope, encoded as CBOR.
+          multipart/related:
+            schema:
+              type: object
+              required:
+                - report
+              properties:
+                report:
+                  $ref: '#/components/schemas/DiagnosticEnvelope'
+                screenshot:
+                  type: string
+                  contentMediaType: image/png
+            encoding:
+              report:
+                contentType: application/json
+              screenshot:
+                contentType: image/png
+                headers:
+                  Content-Location:
+                    schema:
+                      type: string
+                      format: uri-reference
+          '*/*':
+            schema:
+              description: Anything else. The schema constrains nothing at all.
+      responses:
+        '202':
+          summary: Payload accepted
+          description: The payload is stored for 24 hours and then discarded.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticEcho'
+        '413':
+          summary: Payload too large
+          description: The hard limit is 8 MiB.
+          content:
+            application/problem+json:
+              $ref: '#/components/mediaTypes/Problem'
+        '415':
+          summary: Unsupported media type
+          description: Only the types listed above are accepted.
+          content:
+            application/problem+json:
+              $ref: '#/components/mediaTypes/Problem'
+        default:
+          $ref: '#/components/responses/Problem'
+    put:
+      operationId: replaceDiagnosticPayload
+      tags:
+        - diagnostics
+      summary: Replace the stored payload
+      description: |
+        The request body is a `$ref` to `components.requestBodies`, and its examples are
+        in turn `$ref`s into `components.examples`.
+      security:
+        - digestAuth: []
+        - apiKeyHeader: []
+      requestBody:
+        $ref: '#/components/requestBodies/DiagnosticPayload'
+      responses:
+        '204':
+          summary: Replaced
+          description: No body is returned.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Problem'
+    patch:
+      operationId: annotateDiagnosticPayload
+      tags:
+        - diagnostics
+      summary: Annotate the stored payload
+      description: |
+        The request body is optional. `required` defaults to `false`, and it is spelled
+        out here so the rendering is unambiguous.
+      security: []
+      requestBody:
+        required: false
+        description: Omit the body to clear the annotation.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+                  maxLength: 280
+      responses:
+        '204':
+          summary: Annotated
+          description: No body is returned.
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Problem'
+
   /ping:
     $ref: '#/components/pathItems/Ping'
 
@@ -1970,6 +2541,102 @@ components:
       description: |
         Client certificate issued by the Meridian partner CA. Presented at the TLS
         layer, so it carries no wire-level parameters of its own.
+    oauth2Password:
+      type: oauth2
+      description: |
+        Resource owner password credentials, kept only for the legacy mobile app, which
+        has no browser to hand off to. New clients use `oauth2AuthCode` with PKCE.
+      oauth2MetadataUrl: https://auth.meridian.example.com/.well-known/oauth-authorization-server
+      flows:
+        password:
+          tokenUrl: https://auth.meridian.example.com/oauth2/token
+          refreshUrl: https://auth.meridian.example.com/oauth2/token
+          scopes:
+            'accounts:read': Read account details and balances.
+            'transactions:read': Read postings and export them.
+    oauth2AllFlows:
+      type: oauth2
+      description: |
+        One scheme declaring every flow the specification defines. The Flows Object
+        allows all of them side by side, and a client picks whichever it can support.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.meridian.example.com/oauth2/authorize
+          tokenUrl: https://auth.meridian.example.com/oauth2/token
+          refreshUrl: https://auth.meridian.example.com/oauth2/token
+          scopes:
+            'diagnostics:write': Post diagnostic payloads.
+        clientCredentials:
+          tokenUrl: https://auth.meridian.example.com/oauth2/token
+          scopes:
+            'diagnostics:write': Post diagnostic payloads.
+        implicit:
+          authorizationUrl: https://auth.meridian.example.com/oauth2/authorize
+          scopes:
+            'diagnostics:write': Post diagnostic payloads.
+        password:
+          tokenUrl: https://auth.meridian.example.com/oauth2/token
+          scopes:
+            'diagnostics:write': Post diagnostic payloads.
+        deviceAuthorization:
+          deviceAuthorizationUrl: https://auth.meridian.example.com/oauth2/device_authorization
+          tokenUrl: https://auth.meridian.example.com/oauth2/token
+          scopes:
+            'diagnostics:write': Post diagnostic payloads.
+    digestAuth:
+      type: http
+      scheme: digest
+      description: |
+        RFC 7616 digest access authentication, still spoken by the branch back-office
+        terminals. The challenge arrives in `WWW-Authenticate`.
+
+  requestBodies:
+    DiagnosticPayload:
+      description: |
+        The reusable form of the diagnostics body. Referenced from an operation with
+        `$ref`, which is the only place a Request Body Object can be reused.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+          examples:
+            minimal:
+              $ref: '#/components/examples/DiagnosticMinimal'
+            full:
+              $ref: '#/components/examples/DiagnosticFull'
+            external:
+              $ref: '#/components/examples/DiagnosticExternal'
+
+  examples:
+    DiagnosticMinimal:
+      summary: The smallest envelope the server accepts
+      description: Only the two required fields.
+      dataValue:
+        capturedAt: '2026-09-08T11:04:19Z'
+        severity: info
+    DiagnosticFull:
+      summary: Every field populated
+      dataValue:
+        capturedAt: '2026-09-08T11:04:19Z'
+        severity: warning
+        source: switch
+        events:
+          - at: '2026-09-08T11:04:19Z'
+            severity: info
+            message: switch reachable
+          - at: '2026-09-08T11:04:41Z'
+            severity: warning
+            message: authorization latency above 400 ms
+        context:
+          terminal: MK3-0042
+          firmware: 7.2.1
+    DiagnosticExternal:
+      summary: Fetched from the developer portal
+      description: |
+        Carries `externalValue` instead of an inline value. The two are mutually
+        exclusive, so this example holds no data of its own.
+      externalValue: https://developers.meridian.example.com/examples/diagnostic-full.json
 
   parameters:
     AccountId:
@@ -3644,3 +4311,85 @@ components:
                 type: string
               detail:
                 type: string
+
+    DiagnosticEnvelope:
+      title: Diagnostic envelope
+      type: object
+      description: The payload the diagnostics endpoints accept, whatever the media type.
+      required:
+        - capturedAt
+        - severity
+      properties:
+        capturedAt:
+          type: string
+          format: date-time
+        severity:
+          type: string
+          enum:
+            - debug
+            - info
+            - warning
+            - error
+        source:
+          type: string
+          enum:
+            - switch
+            - terminal
+            - portal
+        events:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/DiagnosticEvent'
+        context:
+          type: object
+          description: Free-form key-value pairs. Values are strings only.
+          additionalProperties:
+            type: string
+
+    DiagnosticEvent:
+      title: Diagnostic event
+      type: object
+      description: One line of an `application/x-ndjson` stream.
+      required:
+        - at
+        - severity
+        - message
+      properties:
+        at:
+          type: string
+          format: date-time
+        severity:
+          type: string
+          enum:
+            - debug
+            - info
+            - warning
+            - error
+        message:
+          type: string
+          maxLength: 500
+
+    DiagnosticEcho:
+      title: Diagnostic echo
+      type: object
+      description: What the server parsed out of the request.
+      required:
+        - received
+      properties:
+        received:
+          type: object
+          description: |
+            One entry per parameter or body part, keyed by name. `raw` is the value as
+            it arrived, `parsed` is the value after the declared style was applied.
+          additionalProperties:
+            type: object
+            properties:
+              raw:
+                type: string
+              parsed: {}
+        unrecognised:
+          type: array
+          description: Names the server received but the description does not declare.
+          items:
+            type: string

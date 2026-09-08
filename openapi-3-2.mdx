@@ -40,7 +40,7 @@ it does not support, and fails the build.
 | `XML.nodeType` | `element`, `attribute`, `text`, `cdata`, `none` | `attribute: true` and `wrapped: true`; `text` and `cdata` are lost |
 | `SecurityScheme.deprecated` | Marks two retired schemes | Folded into the description |
 | `oauth2MetadataUrl` | RFC 8414 metadata endpoint | Removed |
-| `deviceAuthorization` flow | Branch terminal login | The scheme is dropped entirely |
+| `deviceAuthorization` flow | Branch terminal login, and one flow of `oauth2AllFlows` | The flow is removed; a scheme left with no flows is dropped, and requirements naming it are filtered out |
 
 ## Losses worth knowing about
 

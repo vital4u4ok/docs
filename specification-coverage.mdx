@@ -7,11 +7,12 @@ description: "What this description exercises, feature by feature."
 
 | | |
 | --- | --- |
-| Paths | 17, plus one reusable path item |
-| Operations | 24, of which 2 use non-standard HTTP methods and 3 are deprecated |
-| Security schemes | 12 |
-| Schemas | 42 |
+| Paths | 20, plus one reusable path item |
+| Operations | 29, of which 2 use non-standard HTTP methods and 3 are deprecated |
+| Security schemes | 15 |
+| Schemas | 45 |
 | Reusable parameters, headers, responses | 6, 8, 10 |
+| Reusable request bodies, examples, media types | 1, 3, 1 |
 
 ## Deprecation
 
@@ -25,32 +26,82 @@ Marked at every level the specification allows:
 
 ## Parameter serialization
 
-Every style, with both `explode` values.
+Every style, in every location that allows it, with both `explode` values.
+`GET /diagnostics/echo` and `GET /diagnostics/path/...` carry the combinations the
+banking operations do not already use, and each parameter there ships a worked example
+showing the data form beside the serialized form.
 
-| Style | Parameter | Serializes as |
-| --- | --- | --- |
-| `form`, `explode: false` | `status` | `status=open,frozen` |
-| `form`, `explode: true` | `type` | `type=debit&type=fee` |
-| `spaceDelimited` | `productCodes` | `productCodes=CU-100%20SV-220` |
-| `pipeDelimited` | `branchCodes` | `branchCodes=a%7Cb` |
-| `deepObject` | `filter` | `filter[holderName]=...` |
-| `label` | `branchId` | `.EU-LON-01` |
-| `matrix` | `coords` | `;lat=51.5;long=-0.12` |
-| `simple` | header parameters | `a,b,c` |
+| Style | Location | `explode` | Serializes as |
+| --- | --- | --- | --- |
+| `form` | query | `false` | `filters=open,frozen` |
+| `form` | query | `true` | `tags=retail&tags=eu` |
+| `form` | query, object | `false` | `flat=status,open,currency,GBP` |
+| `spaceDelimited` | query | `false` | `bbox=-0.51%2051.28` |
+| `spaceDelimited` | query | `true` | `bboxExploded=-0.51&bboxExploded=51.28` |
+| `pipeDelimited` | query | `false` | `codes=GB%7CIE` |
+| `pipeDelimited` | query | `true` | `codesExploded=GB&codesExploded=IE` |
+| `deepObject` | query | `true` | `where[status]=open` |
+| `simple` | header, array | `false` | `hal,problem-json` |
+| `simple` | header, object | `true` | `sampled=true,rate=0.1` |
+| `simple` | path, object | `true` | `kind=card,id=42` |
+| `form` | cookie, object | `true` | `theme=dark; density=compact` |
+| `form` | cookie, array | `false` | `session_flags=beta,internal` |
+| `label` | path, string | default | `.EU-LON-01` |
+| `label` | path, array | `true` | `.eu.lon.01` |
+| `matrix` | path, object | `true` | `;lat=51.5;long=-0.12` |
+| `matrix` | path, array | `false` | `;matrixArray=1,2,3` |
 
-The `q` parameter sets `allowReserved: true`, so reserved characters pass through unencoded.
+Where a style is omitted the default applies, which is `simple` in a path or header and
+`form` in a query or cookie, both with `explode: false`.
+
+Three fields beyond style and explode also appear:
+
+- `allowReserved: true` on `q`, so reserved characters pass through unencoded.
+- `allowEmptyValue: true` on `verbose`, so the key may appear with no value.
+- `content` instead of `schema` on `selector`, which carries a JSON object in one
+  parameter, and on the whole query string of `GET /reports/balances` through the 3.2
+  `in: querystring` location.
+
+## Security
+
+Every scheme type the specification defines, and every OAuth 2 flow.
+
+| Type | Schemes |
+| --- | --- |
+| `oauth2` | `oauth2AuthCode`, `oauth2ClientCredentials`, `oauth2Implicit`, `oauth2Password`, `oauth2Device`, `oauth2AllFlows` |
+| `http` | `basicAuth`, `bearerJwt`, `digestAuth`, `httpSignature` |
+| `apiKey` | `apiKeyHeader`, `apiKeyQuery`, `apiKeyCookie` |
+| `mutualTLS` | `mutualTls` |
+| `openIdConnect` | `openId` |
+
+All five flows appear: `authorizationCode`, `clientCredentials`, `implicit`, `password` and
+the 3.2 `deviceAuthorization`. `oauth2AllFlows` declares all five in a single scheme, which
+the Flows Object allows and most descriptions never do.
+
+Requirements are combined every way the specification permits: a global default, a
+per-operation override, two schemes ANDed inside one requirement, several requirements ORed,
+and `security: []` to opt out entirely.
 
 ## Request and response bodies
 
 - `application/json`, `application/hal+json` and `application/problem+json`
 - `application/merge-patch+json` and `application/json-patch+json` on the same operation
-- `multipart/form-data` with per-part `encoding`, including part headers
-- `application/jsonl` and `text/event-stream` for streamed responses
-- `application/pdf` and `text/csv` binary and text payloads
-- `application/xml` alongside JSON on the same operation, as a request body as well as a response
-- Seven request media types on one operation at `POST /switch/messages`: `application/xml`,
-  `text/xml`, a vendor `+xml` type, `application/json`, `application/x-www-form-urlencoded`,
-  `text/plain` and `application/octet-stream`
+- `multipart/form-data`, `multipart/mixed` and `multipart/related`, each with per-part
+  `encoding` and part headers
+- `application/jsonl` and `text/event-stream` for streamed responses, `application/x-ndjson`
+  for a streamed request body
+- `application/pdf`, `application/zip`, `application/cbor`, `application/octet-stream` and
+  `image/png` binary payloads
+- `text/plain`, `text/csv`, `text/html` and `text/markdown` text payloads
+- `application/xml` alongside JSON on the same operation, as a request body as well as a
+  response, plus `text/xml` and a vendor `+xml` type
+- `application/yaml` and `application/vnd.api+json`
+- `image/*`, a media type range, and `*/*` with an empty schema that constrains nothing
+- Seven request media types on one operation at `POST /switch/messages`, and thirteen at
+  `POST /diagnostics/payload`
+- A body reused through `$ref` from `components.requestBodies`, whose examples are in turn
+  `$ref`s into `components.examples`, including one that uses `externalValue`
+- An optional body on `PATCH /diagnostics/payload`, with `required: false` spelled out
 
 ## XML
 

@@ -55,5 +55,12 @@ failures add an `errors` array that points at each offending field with a JSON P
   ISO 8583 frame.
 - `PUT /reference/tariffs` sends a collection at the root of an XML document, with each item
   discriminated by an attribute.
+- `GET /diagnostics/echo` carries every remaining parameter combination: each style in each
+  location it is allowed, both `explode` values, `allowEmptyValue`, and a parameter described
+  with `content` instead of `schema`.
+- `GET /diagnostics/path/...` covers the path styles with the `explode` values the banking
+  operations do not use.
+- `POST /diagnostics/payload` accepts thirteen media types, including a media type range and
+  a catch-all with an empty schema.
 - `GET /branches/{branchId}/atms/{coords}` uses the two path-only serialization styles,
   `label` and `matrix`.
