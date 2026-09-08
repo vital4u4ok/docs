@@ -1053,6 +1053,382 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
+  /cards/{cardId}/authorizations:
+    parameters:
+    - name: cardId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      operationId: authorizeCard
+      tags:
+      - cards
+      summary: Authorize a card transaction
+      description: |
+        XML is the canonical request body here — the switch speaks XML — and JSON is
+        offered alongside it only so the same payload can be read both ways.
+
+        `CardAuthorization` carries one of every JSON Schema type (`string`, `integer`,
+        `number`, `boolean`, `array`, `object`, `null`) and uses every `nodeType` the
+        XML object defines: `attribute`, `element`, `text`, `cdata` and `none`.
+      security:
+      - mutualTls: []
+        oauth2ClientCredentials:
+        - cards:write
+      - basicAuth: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        description: The authorization message.
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/CardAuthorization'
+            examples:
+              contactless:
+                summary: Contactless purchase, card present
+                description: |
+                  `dataValue` is the schema-valid data. `serializedValue` is what goes on
+                  the wire once the `xml` keywords in the schema are applied.
+                value:
+                  messageId: 3f2a9c14-6d0b-4f5e-9c2a-77b1e0d4a913
+                  sequence: 4471
+                  test: false
+                  cardId: 8c1a7d4e-2b8c-4a2f-9a41-0d5a6f5b2f0e
+                  amount:
+                    value: '42.50'
+                    currency: GBP
+                  exchangeRate: 1.0
+                  instalments: 1
+                  cardPresent: true
+                  entryMode: contactless
+                  capturedAt: '2026-09-08T11:04:19Z'
+                  expiresOn: '2029-04-30'
+                  reversalOf: null
+                  merchant:
+                    id: '412200871'
+                    mcc: '5812'
+                    name: Bletchley Coffee House
+                    country: GB
+                    address:
+                      line1: 12 Wilton Avenue
+                      city: Milton Keynes
+                      postcode: MK3 6EB
+                  terminalNote: Tap & go; printed receipt declined
+                  emvTags:
+                  - 9F02:000000004250
+                  - 9F36:00A4
+                  riskFlags:
+                  - velocity
+                  cryptogram: 3q2+7wAAAAA=
+              reversal:
+                summary: Reversal of an earlier authorization, card not present
+                description: |
+                  A negative amount, `reversalOf` populated, no merchant address, and two
+                  repeated `riskFlag` elements from the unwrapped array.
+                value:
+                  messageId: 5b71e0d4-a913-4c88-b0f2-1e9a3c7d0442
+                  sequence: 4472
+                  cardId: 8c1a7d4e-2b8c-4a2f-9a41-0d5a6f5b2f0e
+                  amount:
+                    value: '-42.50'
+                    currency: GBP
+                  cardPresent: false
+                  entryMode: ecommerce
+                  capturedAt: '2026-09-08T11:09:02Z'
+                  reversalOf: 3f2a9c14-6d0b-4f5e-9c2a-77b1e0d4a913
+                  merchant:
+                    id: '412200871'
+                    mcc: '5812'
+                    name: Bletchley Coffee House
+                    country: GB
+                  terminalNote: Customer cancelled at the terminal
+                  riskFlags:
+                  - geo-mismatch
+                  - new-device
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardAuthorization'
+            examples:
+              contactless:
+                summary: The same message as JSON
+                description: |
+                  The `xml` keywords in the schema have no effect here, so attributes,
+                  text nodes and CDATA all collapse back to ordinary properties.
+                value:
+                  messageId: 3f2a9c14-6d0b-4f5e-9c2a-77b1e0d4a913
+                  sequence: 4471
+                  test: false
+                  cardId: 8c1a7d4e-2b8c-4a2f-9a41-0d5a6f5b2f0e
+                  amount:
+                    value: '42.50'
+                    currency: GBP
+                  cardPresent: true
+                  entryMode: contactless
+                  capturedAt: '2026-09-08T11:04:19Z'
+                  merchant:
+                    id: '412200871'
+                    mcc: '5812'
+                    name: Bletchley Coffee House
+                    country: GB
+                  riskFlags:
+                  - velocity
+      responses:
+        '201':
+          description: |
+            Authorization decided. Returned in the media type the request asked for with `Accept`, defaulting to
+            the media type the request was sent in.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CardAuthorizationResult'
+              examples:
+                approved:
+                  summary: Approved
+                  value:
+                    messageId: 3f2a9c14-6d0b-4f5e-9c2a-77b1e0d4a913
+                    decision: approved
+                    authCode: 7K2P41
+                    availableBalance:
+                      value: '958.14'
+                      currency: GBP
+                    receivedAt: '2026-09-08T11:04:19Z'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardAuthorizationResult'
+        '402':
+          description: |
+            The switch reached a decision and it was `declined`. The body is a result, not
+            a problem document, because nothing went wrong with the request itself.
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CardAuthorizationResult'
+              examples:
+                insufficientFunds:
+                  summary: Insufficient funds
+                  value:
+                    messageId: 3f2a9c14-6d0b-4f5e-9c2a-77b1e0d4a913
+                    decision: declined
+                    declineReason: Insufficient funds; available 12.06 GBP
+                    availableBalance:
+                      value: '12.06'
+                      currency: GBP
+                    receivedAt: '2026-09-08T11:04:19Z'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardAuthorizationResult'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '415':
+          description: Unsupported media type. The body was neither `application/xml` nor `application/json`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                    - pointer: /holder/dateOfBirth
+                      code: min_age
+                      detail: The account holder must be at least 18 years old.
+                    - pointer: /currency
+                      code: unsupported
+                      detail: JPY is not offered on personal accounts.
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Problem'
+  /switch/messages:
+    post:
+      operationId: postSwitchMessage
+      deprecated: true
+      tags:
+      - cards
+      - sunset
+      summary: Post a raw switch message
+      description: |
+        One operation, seven request media types: the same authorization can arrive as XML
+        under two media types and a vendor one, as JSON, as form encoding, as a
+        pipe-delimited line, or as a raw ISO 8583 frame. Which one a terminal sends
+        depends on how old it is.
+
+        Use `POST /cards/{cardId}/authorizations` instead. This endpoint is removed on
+        the sunset date below.
+      security:
+      - basicAuth: []
+      - mutualTls: []
+        httpSignature: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        description: The same logical message in whichever encoding the terminal speaks.
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/CardAuthorization'
+          text/xml:
+            schema:
+              $ref: '#/components/schemas/CardAuthorization'
+            examples:
+              minimal:
+                summary: The smallest message the switch accepts
+                value:
+                  messageId: 3f2a9c14-6d0b-4f5e-9c2a-77b1e0d4a913
+                  sequence: 4471
+                  cardId: 8c1a7d4e-2b8c-4a2f-9a41-0d5a6f5b2f0e
+                  amount:
+                    value: '42.50'
+                    currency: GBP
+                  cardPresent: true
+                  entryMode: contactless
+                  capturedAt: '2026-09-08T11:04:19Z'
+                  merchant:
+                    id: '412200871'
+                    mcc: '5812'
+                    name: Bletchley Coffee House
+                    country: GB
+          application/vnd.meridian.switch+xml;version=2:
+            schema:
+              $ref: '#/components/schemas/CardAuthorization'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardAuthorization'
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              description: |
+                Form encoding has no nesting, so the message is flattened: the arrays are
+                repeated keys and the merchant is serialized with `deepObject`.
+              required:
+              - messageId
+              - cardId
+              - amount
+              - currency
+              properties:
+                messageId:
+                  type: string
+                  format: uuid
+                cardId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: string
+                  pattern: ^-?[0-9]{1,15}\.[0-9]{2}$
+                currency:
+                  $ref: '#/components/schemas/CurrencyCode'
+                cardPresent:
+                  type: boolean
+                  default: true
+                entryMode:
+                  type: string
+                  enum:
+                  - chip
+                  - contactless
+                  - magstripe
+                  - ecommerce
+                  - manual
+                riskFlags:
+                  type: array
+                  items:
+                    type: string
+                merchant:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    mcc:
+                      type: string
+                    name:
+                      type: string
+            encoding:
+              riskFlags:
+                style: form
+                explode: true
+              merchant:
+                style: deepObject
+                explode: true
+                allowReserved: false
+          text/plain:
+            schema:
+              type: string
+              maxLength: 1024
+              pattern: ^0100\|
+              description: |
+                Pipe-delimited record, in field order: MTI, message id, card id, minor
+                units, currency, entry mode, capture timestamp, merchant id.
+            example: |
+              0100|3f2a9c14-6d0b-4f5e-9c2a-77b1e0d4a913|8c1a7d4e-2b8c-4a2f-9a41-0d5a6f5b2f0e|4250|826|07|20260908110419|412200871
+          application/octet-stream:
+            schema:
+              type: string
+              contentMediaType: application/octet-stream
+              description: Raw ISO 8583 frame, two-byte big-endian length prefix included.
+      responses:
+        '202':
+          description: |
+            Message queued. The switch acknowledges the frame; the decision follows on the terminal's own
+            response channel.
+          headers:
+            Deprecation:
+              $ref: '#/components/headers/Deprecation'
+            Sunset:
+              $ref: '#/components/headers/Sunset'
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/CardAuthorizationResult'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardAuthorizationResult'
+            text/plain:
+              schema:
+                type: string
+                description: Single line, `ACK` followed by the message id.
+              example: ACK 3f2a9c14-6d0b-4f5e-9c2a-77b1e0d4a913
+        '415':
+          description: Unsupported media type. The `Content-Type` is not one of the seven the switch accepts.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                    - pointer: /holder/dateOfBirth
+                      code: min_age
+                      detail: The account holder must be at least 18 years old.
+                    - pointer: /currency
+                      code: unsupported
+                      detail: JPY is not offered on personal accounts.
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        default:
+          $ref: '#/components/responses/Problem'
   /branches/{branchId}/atms/{coords}:
     get:
       operationId: findAtms
@@ -1194,6 +1570,95 @@ paths:
                 $ref: '#/components/schemas/FxQuote'
         '404':
           $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/Problem'
+  /reference/tariffs:
+    put:
+      operationId: replaceTariffs
+      tags:
+      - reference
+      summary: Replace the tariff table
+      description: |
+        A collection at the root of an XML body: `ref:tariffs` carries its metadata as
+        attributes and holds an unwrapped array whose items are discriminated by the
+        `kind` attribute, so each `tariff` element is one of three different shapes.
+      security:
+      - mutualTls: []
+        apiKeyHeader: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        description: The complete table. Anything absent from the body is removed.
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/TariffTable'
+            examples:
+              mixed:
+                summary: One tariff of each kind
+                value:
+                  effectiveFrom: '2026-10-01'
+                  tariffs:
+                  - code: ATM_WITHDRAWAL_EU
+                    kind: flat
+                    label: ATM withdrawal inside the EEA
+                    appliesTo:
+                    - personal
+                    fee:
+                      value: '1.50'
+                      currency: EUR
+                  - code: FX_MARKUP
+                    kind: percentage
+                    label: Foreign exchange markup
+                    appliesTo:
+                    - personal
+                    - business
+                    rate: 0.0175
+                    minimumFee:
+                      value: '0.50'
+                      currency: GBP
+                    maximumFee:
+                      value: '25.00'
+                      currency: GBP
+                  - code: WIRE_OUT
+                    kind: tiered
+                    label: Outbound wire transfer
+                    appliesTo:
+                    - business
+                    tiers:
+                    - upTo: 1000
+                      fee:
+                        value: '4.00'
+                        currency: GBP
+                    - upTo: 50000
+                      fee:
+                        value: '12.00'
+                        currency: GBP
+                    - upTo: null
+                      fee:
+                        value: '30.00'
+                        currency: GBP
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TariffTable'
+      responses:
+        '200':
+          description: Table replaced. The stored table, with the revision the server assigned.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/TariffTable'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TariffTable'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Problem'
   /ping:
@@ -1363,6 +1828,7 @@ components:
           scopes:
             accounts:write: Open accounts on behalf of an onboarded partner.
             transactions:read: Read postings across the partner's portfolio.
+            cards:write: Authorize and reverse card transactions.
     oauth2Implicit:
       type: oauth2
       description: |-
@@ -2597,6 +3063,231 @@ components:
             - stolen
             xml:
               name: status
+    XmlMoney:
+      title: Money (XML)
+      type: object
+      description: |
+        The same amount as `Money`, shaped for XML: the decimal is the element's text
+        node and the currency is an attribute. No `xml.name` is set, so each use takes
+        the name of the property it sits under.
+      required:
+      - value
+      - currency
+      additionalProperties: false
+      properties:
+        value:
+          type: string
+          pattern: ^-?[0-9]{1,15}\.[0-9]{2}$
+          description: Signed decimal in major units, always two fractional digits.
+        currency:
+          type: string
+          enum:
+          - GBP
+          - EUR
+          - USD
+          - CHF
+          - PLN
+          - UAH
+          xml:
+            attribute: true
+    XmlMerchant:
+      title: Merchant (XML)
+      type: object
+      description: Nested object with attributes of its own and a prefixed child element.
+      xml:
+        name: merchant
+      required:
+      - id
+      - mcc
+      - name
+      - country
+      properties:
+        id:
+          type: string
+          pattern: ^[0-9]{8,15}$
+          xml:
+            attribute: true
+        mcc:
+          type: string
+          pattern: ^[0-9]{4}$
+          description: Merchant category code.
+          xml:
+            attribute: true
+        name:
+          type: string
+          maxLength: 128
+        country:
+          type: string
+          pattern: ^[A-Z]{2}$
+          description: ISO 3166-1 alpha-2, emitted in the switch namespace.
+          xml:
+            namespace: urn:meridian:switch
+            prefix: sw
+        address:
+          type: object
+          description: Omitted for card-not-present authorizations.
+          xml:
+            name: address
+          properties:
+            line1:
+              type: string
+            city:
+              type: string
+            postcode:
+              type: string
+    CardAuthorization:
+      title: Card authorization
+      type: object
+      description: |
+        An authorization as the card switch sends it. Every JSON Schema type appears at
+        least once — `string`, `integer`, `number`, `boolean`, `array`, `object` and
+        `null` — and every `nodeType` the XML object defines is used: `attribute`,
+        `element`, `text`, `cdata` and `none`.
+      xml:
+        name: authorization
+        namespace: urn:meridian:switch
+        prefix: sw
+      required:
+      - messageId
+      - sequence
+      - cardId
+      - amount
+      - cardPresent
+      - entryMode
+      - capturedAt
+      properties:
+        messageId:
+          type: string
+          format: uuid
+          description: Switch-assigned identifier for this message.
+          xml:
+            attribute: true
+        sequence:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Monotonic counter within the switch session.
+          xml:
+            attribute: true
+        test:
+          type: boolean
+          default: false
+          description: Set on messages replayed from the certification harness.
+          xml:
+            attribute: true
+        cardId:
+          type: string
+          format: uuid
+        amount:
+          $ref: '#/components/schemas/XmlMoney'
+        exchangeRate:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          description: Applied when the terminal currency differs from the account currency.
+        instalments:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 60
+          default: 1
+        cardPresent:
+          type: boolean
+        entryMode:
+          type: string
+          enum:
+          - chip
+          - contactless
+          - magstripe
+          - ecommerce
+          - manual
+        capturedAt:
+          type: string
+          format: date-time
+        expiresOn:
+          type: string
+          format: date
+          description: Expiry printed on the card, as a full date on the last day of the month.
+        reversalOf:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: The authorization being reversed. An empty element means null.
+        merchant:
+          $ref: '#/components/schemas/XmlMerchant'
+        terminalNote:
+          type: string
+          maxLength: 512
+          description: Operator free text, emitted as a CDATA section so punctuation needs no escaping.
+        emvTags:
+          type: array
+          maxItems: 64
+          description: Wrapped array — the items sit inside an `emvTags` element.
+          xml:
+            name: emvTags
+            wrapped: true
+          items:
+            type: string
+            pattern: ^[0-9A-F]{4}:[0-9A-F]+$
+            xml:
+              name: tag
+        riskFlags:
+          type: array
+          uniqueItems: true
+          description: Unwrapped array — `riskFlag` elements repeat directly under the root.
+          items:
+            type: string
+            enum:
+            - velocity
+            - geo-mismatch
+            - blacklist
+            - new-device
+            xml:
+              name: riskFlag
+        cryptogram:
+          type: string
+          contentEncoding: base64
+          contentMediaType: application/octet-stream
+          description: Application cryptogram as issued by the chip.
+    CardAuthorizationResult:
+      title: Authorization result
+      type: object
+      xml:
+        name: authorizationResult
+        namespace: urn:meridian:switch
+        prefix: sw
+      required:
+      - messageId
+      - decision
+      - receivedAt
+      properties:
+        messageId:
+          type: string
+          format: uuid
+          description: Echoed from the request.
+          xml:
+            attribute: true
+        decision:
+          type: string
+          enum:
+          - approved
+          - declined
+          - referred
+          xml:
+            attribute: true
+        authCode:
+          type: string
+          pattern: ^[0-9A-Z]{6}$
+          description: Present only when `decision` is `approved`.
+        declineReason:
+          type: string
+          description: Scheme wording, passed through unaltered.
+        availableBalance:
+          $ref: '#/components/schemas/XmlMoney'
+        receivedAt:
+          type: string
+          format: date-time
     Atm:
       title: ATM
       type: object
@@ -2658,6 +3349,168 @@ components:
         quoteId:
           type: string
           format: uuid
+    TariffTable:
+      title: Tariff table
+      type: object
+      description: |
+        A collection at the root of the document. `effectiveFrom` and `revision` are
+        attributes on the root element, and the array itself is unwrapped, so the
+        `tariff` elements are direct children of `ref:tariffs`.
+      xml:
+        name: tariffs
+        namespace: urn:meridian:reference
+        prefix: ref
+      required:
+      - effectiveFrom
+      - tariffs
+      properties:
+        effectiveFrom:
+          type: string
+          format: date
+          xml:
+            attribute: true
+        revision:
+          type: integer
+          format: int32
+          minimum: 1
+          readOnly: true
+          description: Assigned by the server on write.
+          xml:
+            attribute: true
+        tariffs:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/Tariff'
+    Tariff:
+      title: Tariff
+      description: One of three shapes, chosen by the `kind` attribute.
+      xml:
+        name: tariff
+      oneOf:
+      - $ref: '#/components/schemas/FlatFeeTariff'
+      - $ref: '#/components/schemas/PercentageTariff'
+      - $ref: '#/components/schemas/TieredTariff'
+      discriminator:
+        propertyName: kind
+        mapping:
+          flat: '#/components/schemas/FlatFeeTariff'
+          percentage: '#/components/schemas/PercentageTariff'
+          tiered: '#/components/schemas/TieredTariff'
+    TariffBase:
+      title: Tariff (common fields)
+      type: object
+      required:
+      - code
+      - kind
+      - label
+      properties:
+        code:
+          type: string
+          pattern: ^[A-Z0-9_]{3,32}$
+          xml:
+            attribute: true
+        kind:
+          type: string
+          xml:
+            attribute: true
+        label:
+          type: string
+          maxLength: 120
+        appliesTo:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          xml:
+            name: appliesTo
+            wrapped: true
+          items:
+            type: string
+            enum:
+            - personal
+            - business
+            xml:
+              name: segment
+    FlatFeeTariff:
+      title: Flat fee tariff
+      allOf:
+      - $ref: '#/components/schemas/TariffBase'
+      - type: object
+        required:
+        - fee
+        properties:
+          kind:
+            type: string
+            const: flat
+            xml:
+              attribute: true
+          fee:
+            $ref: '#/components/schemas/XmlMoney'
+    PercentageTariff:
+      title: Percentage tariff
+      allOf:
+      - $ref: '#/components/schemas/TariffBase'
+      - type: object
+        required:
+        - rate
+        properties:
+          kind:
+            type: string
+            const: percentage
+            xml:
+              attribute: true
+          rate:
+            type: number
+            format: double
+            minimum: 0
+            maximum: 1
+            description: Fraction of the transaction amount, not a percentage.
+          minimumFee:
+            $ref: '#/components/schemas/XmlMoney'
+          maximumFee:
+            $ref: '#/components/schemas/XmlMoney'
+    TieredTariff:
+      title: Tiered tariff
+      allOf:
+      - $ref: '#/components/schemas/TariffBase'
+      - type: object
+        required:
+        - tiers
+        properties:
+          kind:
+            type: string
+            const: tiered
+            xml:
+              attribute: true
+          tiers:
+            type: array
+            minItems: 1
+            maxItems: 12
+            xml:
+              name: tiers
+              wrapped: true
+            items:
+              type: object
+              required:
+              - upTo
+              - fee
+              xml:
+                name: tier
+              properties:
+                upTo:
+                  type:
+                  - number
+                  - 'null'
+                  format: double
+                  exclusiveMinimum: 0
+                  description: |
+                    Upper bound of the tier. Null on the top tier, which is unbounded; XML
+                    has no null attribute, so the attribute is omitted there instead.
+                  xml:
+                    attribute: true
+                fee:
+                  $ref: '#/components/schemas/XmlMoney'
     Problem:
       title: Problem details
       description: RFC 9457 problem details, extended with a machine-readable `errors` array.

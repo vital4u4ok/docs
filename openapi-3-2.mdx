@@ -37,7 +37,7 @@ it does not support, and fails the build.
 | `Discriminator.defaultMapping` | Fallback variant for unmapped values | Removed |
 | `Example.dataValue`, `serializedValue` | Data form and wire form side by side | Collapsed onto `value` |
 | `components.mediaTypes` | One reusable problem-details media type | Inlined at every use |
-| `XML.nodeType` | `element`, `attribute`, `cdata` | `attribute: true` and `wrapped: true` |
+| `XML.nodeType` | `element`, `attribute`, `text`, `cdata`, `none` | `attribute: true` and `wrapped: true`; `text` and `cdata` are lost |
 | `SecurityScheme.deprecated` | Marks two retired schemes | Folded into the description |
 | `oauth2MetadataUrl` | RFC 8414 metadata endpoint | Removed |
 | `deviceAuthorization` flow | Branch terminal login | The scheme is dropped entirely |

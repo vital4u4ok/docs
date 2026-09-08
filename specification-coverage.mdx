@@ -7,10 +7,10 @@ description: "What this description exercises, feature by feature."
 
 | | |
 | --- | --- |
-| Paths | 14, plus one reusable path item |
-| Operations | 21, of which 2 use non-standard HTTP methods and 2 are deprecated |
+| Paths | 17, plus one reusable path item |
+| Operations | 24, of which 2 use non-standard HTTP methods and 3 are deprecated |
 | Security schemes | 12 |
-| Schemas | 32 |
+| Schemas | 42 |
 | Reusable parameters, headers, responses | 6, 8, 10 |
 
 ## Deprecation
@@ -47,7 +47,27 @@ The `q` parameter sets `allowReserved: true`, so reserved characters pass throug
 - `multipart/form-data` with per-part `encoding`, including part headers
 - `application/jsonl` and `text/event-stream` for streamed responses
 - `application/pdf` and `text/csv` binary and text payloads
-- `application/xml` alongside JSON on the same operation
+- `application/xml` alongside JSON on the same operation, as a request body as well as a response
+- Seven request media types on one operation at `POST /switch/messages`: `application/xml`,
+  `text/xml`, a vendor `+xml` type, `application/json`, `application/x-www-form-urlencoded`,
+  `text/plain` and `application/octet-stream`
+
+## XML
+
+`POST /cards/{cardId}/authorizations` takes XML as its canonical request body, and its schema uses
+every `nodeType` the XML object defines:
+
+| `nodeType` | Where | On the wire |
+| --- | --- | --- |
+| `attribute` | `messageId`, `sequence`, `test` | `<sw:authorization messageId="..." sequence="4471">` |
+| `element` | `cardId`, `capturedAt` | `<cardId>...</cardId>` |
+| `text` | `XmlMoney.value` | `<amount currency="GBP">42.50</amount>` |
+| `cdata` | `terminalNote` | `<terminalNote><![CDATA[Tap & go]]></terminalNote>` |
+| `none` | `riskFlags` | `<riskFlag>` repeated with no wrapper |
+
+Namespaces and prefixes appear on the root element and on a single child, `merchant/sw:country`.
+`PUT /reference/tariffs` puts a collection at the root instead: an unwrapped array whose items are
+discriminated by a `kind` attribute, so each `tariff` element is one of three shapes.
 
 ## JSON Schema
 

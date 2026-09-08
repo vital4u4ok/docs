@@ -49,5 +49,11 @@ failures add an `errors` array that points at each offending field with a JSON P
 - `GET /accounts/{accountId}/transactions/export` streams JSON Lines or CSV.
 - `POST /documents` declares a content type and headers for each multipart part.
 - `GET /cards/{cardId}` serves the same resource as JSON and as XML.
+- `POST /cards/{cardId}/authorizations` takes XML as its request body, using every XML
+  `nodeType`: attributes, elements, a text node, a CDATA section and an unwrapped array.
+- `POST /switch/messages` accepts the same message in seven media types, from XML to a raw
+  ISO 8583 frame.
+- `PUT /reference/tariffs` sends a collection at the root of an XML document, with each item
+  discriminated by an attribute.
 - `GET /branches/{branchId}/atms/{coords}` uses the two path-only serialization styles,
   `label` and `matrix`.
