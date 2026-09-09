@@ -65,9 +65,9 @@ tags:
   description: Subject to breaking change without a major version bump.
 - name: diagnostics
   description: |
-    Endpoints that exist to exercise this description rather than to move money.
-    Every parameter style, media type and security scheme that the rest of the API
-    does not already use is reachable from here.
+    A single operation that exists to exercise this description rather than to move
+    money. Every security scheme, request media type, parameter location, style,
+    `explode` value and data type the specification allows is reachable from it.
 - name: sunset
   description: Scheduled for removal. Migrate before the sunset date.
 security:
@@ -1666,482 +1666,889 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Problem'
-  /diagnostics/echo:
-    get:
-      operationId: echoParameters
+  ? /diagnostics/everything/{simpleString}/{simpleArray}/{simpleArrayExploded}/{simpleObject}/{simpleObjectExploded}/{labelString}/{labelArray}/{labelArrayExploded}/{labelObject}/{labelObjectExploded}/{matrixString}/{matrixArray}/{matrixArrayExploded}/{matrixObject}/{matrixObjectExploded}
+  : post:
+      operationId: exerciseEverything
       tags:
       - diagnostics
-      summary: Echo every parameter back
+      summary: Exercise everything at once
       description: |
-        Every remaining parameter combination the specification allows, in one place:
-        `form`, `spaceDelimited`, `pipeDelimited` and `deepObject` in the query,
-        `simple` in a header, `form` in a cookie, each with both `explode` values, plus
-        `allowEmptyValue` and a parameter described with `content` instead of `schema`.
+        One operation carrying every security scheme this description defines, every request
+        media type it uses, and every parameter location, style, `explode` value and data type
+        the specification allows.
 
-        The response reports what the server parsed, so a client can check its own
-        serializer against the description.
+        It replaces the three narrower diagnostics operations that used to sit here. Nothing
+        about it is realistic; it exists so a renderer can be pushed at its limits on a single
+        page.
+
+        The one location missing is `in: querystring`, which describes the whole query string as
+        a single parameter and therefore cannot coexist with individual query parameters. It
+        lives on `GET /reports/balances` instead.
       security:
+      - oauth2AuthCode:
+        - accounts:read
+      - oauth2ClientCredentials:
+        - cards:write
+      - oauth2Implicit:
+        - accounts:read
+      - oauth2Password:
+        - accounts:read
+      - oauth2AllFlows:
+        - diagnostics:write
+      - openId: []
+      - bearerJwt: []
+      - basicAuth: []
       - digestAuth: []
+      - httpSignature: []
+      - apiKeyHeader: []
+      - apiKeyQuery: []
+      - apiKeyCookie: []
+      - mutualTls: []
+      - mutualTls: []
+        httpSignature: []
+      - mutualTls: []
+        oauth2ClientCredentials:
+        - cards:write
       parameters:
-      - name: tags
+      - name: qString
         in: query
-        style: form
-        explode: true
-        description: Array, exploded. The key repeats once per item.
+        description: Scalar `String` in the query.
         schema:
-          type: array
-          items:
-            type: string
-        examples:
-          two:
-            value:
-            - retail
-            - eu
-      - name: filters
+          type: string
+          maxLength: 64
+      - name: qInt32
         in: query
-        style: form
-        explode: false
-        description: Array, not exploded. One key, comma separated.
+        description: Scalar `Int32` in the query.
         schema:
-          type: array
-          items:
-            type: string
-        examples:
-          two:
-            value:
-            - open
-            - frozen
-      - name: flat
+          type: integer
+          format: int32
+      - name: qInt64
         in: query
-        style: form
-        explode: false
-        description: Object, not exploded. Keys and values alternate in one value.
+        description: Scalar `Int64` in the query.
         schema:
-          type: object
-          properties:
-            status:
-              type: string
-            currency:
-              type: string
-        examples:
-          pair:
-            value:
-              status: open
-              currency: GBP
-      - name: bbox
+          type: integer
+          format: int64
+      - name: qFloat
         in: query
-        style: spaceDelimited
-        explode: false
-        description: Space delimited, not exploded. The spaces are percent encoded.
+        description: Scalar `Float` in the query.
         schema:
-          type: array
-          items:
-            type: number
-            format: double
-        examples:
-          box:
-            value:
-            - -0.51
-            - 51.28
-            - 0.33
-            - 51.69
-      - name: bboxExploded
+          type: number
+          format: float
+      - name: qDouble
         in: query
-        style: spaceDelimited
-        explode: true
-        description: |
-          Space delimited, exploded. Exploding removes the delimiter entirely, so this
-          is indistinguishable from `form` with `explode: true`.
+        description: Scalar `Double` in the query.
         schema:
-          type: array
-          items:
-            type: number
-            format: double
-        examples:
-          box:
-            value:
-            - -0.51
-            - 51.28
-      - name: codes
+          type: number
+          format: double
+          exclusiveMinimum: 0
+      - name: qBoolean
         in: query
-        style: pipeDelimited
-        explode: false
-        description: Pipe delimited, not exploded.
-        schema:
-          type: array
-          items:
-            type: string
-        examples:
-          two:
-            value:
-            - GB
-            - IE
-      - name: codesExploded
-        in: query
-        style: pipeDelimited
-        explode: true
-        description: Pipe delimited, exploded. As above, the delimiter disappears.
-        schema:
-          type: array
-          items:
-            type: string
-        examples:
-          two:
-            value:
-            - GB
-            - IE
-      - name: where
-        in: query
-        style: deepObject
-        explode: true
-        description: Nested object, one bracketed key per property.
-        schema:
-          type: object
-          properties:
-            status:
-              type: string
-            minBalance:
-              type: number
-              format: double
-        examples:
-          pair:
-            value:
-              status: open
-              minBalance: 100
-      - name: verbose
-        in: query
-        allowEmptyValue: true
-        description: |
-          Flag parameter. `allowEmptyValue` lets the key appear with no value at all.
-          The specification marks this field as not recommended, and it is here to be
-          rendered rather than copied.
+        description: Scalar `Boolean` in the query.
         schema:
           type: boolean
           default: false
-        examples:
-          bare:
-            value: true
-      - name: selector
+      - name: qNullable
         in: query
-        description: |
-          A structured value carried in a single parameter, described with `content`
-          rather than `schema`, so the media type says how it is encoded.
+        description: Scalar `Nullable` in the query.
+        schema:
+          type:
+          - string
+          - 'null'
+      - name: qUuid
+        in: query
+        description: Scalar `Uuid` in the query.
+        schema:
+          type: string
+          format: uuid
+      - name: qDate
+        in: query
+        description: Scalar `Date` in the query.
+        schema:
+          type: string
+          format: date
+      - name: qDateTime
+        in: query
+        description: Scalar `DateTime` in the query.
+        schema:
+          type: string
+          format: date-time
+      - name: qTime
+        in: query
+        description: Scalar `Time` in the query.
+        schema:
+          type: string
+          format: time
+      - name: qDuration
+        in: query
+        description: Scalar `Duration` in the query.
+        schema:
+          type: string
+          format: duration
+      - name: qEmail
+        in: query
+        description: Scalar `Email` in the query.
+        schema:
+          type: string
+          format: email
+      - name: qIdnEmail
+        in: query
+        description: Scalar `IdnEmail` in the query.
+        schema:
+          type: string
+          format: idn-email
+      - name: qHostname
+        in: query
+        description: Scalar `Hostname` in the query.
+        schema:
+          type: string
+          format: hostname
+      - name: qIpv4
+        in: query
+        description: Scalar `Ipv4` in the query.
+        schema:
+          type: string
+          format: ipv4
+      - name: qIpv6
+        in: query
+        description: Scalar `Ipv6` in the query.
+        schema:
+          type: string
+          format: ipv6
+      - name: qUri
+        in: query
+        description: Scalar `Uri` in the query.
+        schema:
+          type: string
+          format: uri
+      - name: qUriRef
+        in: query
+        description: Scalar `UriRef` in the query.
+        schema:
+          type: string
+          format: uri-reference
+      - name: qIri
+        in: query
+        description: Scalar `Iri` in the query.
+        schema:
+          type: string
+          format: iri
+      - name: qJsonPointer
+        in: query
+        description: Scalar `JsonPointer` in the query.
+        schema:
+          type: string
+          format: json-pointer
+      - name: qRegex
+        in: query
+        description: Scalar `Regex` in the query.
+        schema:
+          type: string
+          format: regex
+      - name: qBase64
+        in: query
+        description: Scalar `Base64` in the query.
+        schema:
+          type: string
+          contentEncoding: base64
+      - name: qPassword
+        in: query
+        description: Scalar `Password` in the query.
+        schema:
+          type: string
+          format: password
+      - name: qPattern
+        in: query
+        description: Scalar `Pattern` in the query.
+        schema:
+          type: string
+          pattern: ^[A-Z]{2}-[0-9]{4}$
+      - name: qEnum
+        in: query
+        description: Scalar `Enum` in the query.
+        schema:
+          type: string
+          enum:
+          - alpha
+          - beta
+          - gamma
+      - name: qConst
+        in: query
+        description: Scalar `Const` in the query.
+        schema:
+          type: string
+          const: fixed
+      - name: qStringList
+        in: query
+        style: form
+        explode: false
+        description: Array of `string`, one key, comma separated.
+        schema:
+          type: array
+          items:
+            type: string
+      - name: qStringListExploded
+        in: query
+        style: form
+        explode: true
+        description: Array of `string`, the key repeats.
+        schema:
+          type: array
+          items:
+            type: string
+      - name: qIntList
+        in: query
+        style: form
+        explode: false
+        description: Array of `int`, one key, comma separated.
+        schema:
+          type: array
+          items:
+            type: integer
+            format: int32
+      - name: qIntListExploded
+        in: query
+        style: form
+        explode: true
+        description: Array of `int`, the key repeats.
+        schema:
+          type: array
+          items:
+            type: integer
+            format: int32
+      - name: qNumberList
+        in: query
+        style: form
+        explode: false
+        description: Array of `number`, one key, comma separated.
+        schema:
+          type: array
+          items:
+            type: number
+            format: double
+      - name: qNumberListExploded
+        in: query
+        style: form
+        explode: true
+        description: Array of `number`, the key repeats.
+        schema:
+          type: array
+          items:
+            type: number
+            format: double
+      - name: qBoolList
+        in: query
+        style: form
+        explode: false
+        description: Array of `bool`, one key, comma separated.
+        schema:
+          type: array
+          items:
+            type: boolean
+      - name: qBoolListExploded
+        in: query
+        style: form
+        explode: true
+        description: Array of `bool`, the key repeats.
+        schema:
+          type: array
+          items:
+            type: boolean
+      - name: qUuidList
+        in: query
+        style: form
+        explode: false
+        description: Array of `uuid`, one key, comma separated.
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+      - name: qUuidListExploded
+        in: query
+        style: form
+        explode: true
+        description: Array of `uuid`, the key repeats.
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+      - name: qDateList
+        in: query
+        style: form
+        explode: false
+        description: Array of `date`, one key, comma separated.
+        schema:
+          type: array
+          items:
+            type: string
+            format: date
+      - name: qDateListExploded
+        in: query
+        style: form
+        explode: true
+        description: Array of `date`, the key repeats.
+        schema:
+          type: array
+          items:
+            type: string
+            format: date
+      - name: qEnumList
+        in: query
+        style: form
+        explode: false
+        description: Array of `enum`, one key, comma separated.
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - alpha
+            - beta
+            - gamma
+      - name: qEnumListExploded
+        in: query
+        style: form
+        explode: true
+        description: Array of `enum`, the key repeats.
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - alpha
+            - beta
+            - gamma
+      - name: qNullableList
+        in: query
+        style: form
+        explode: false
+        description: Array of `nullable`, one key, comma separated.
+        schema:
+          type: array
+          items:
+            type:
+            - string
+            - 'null'
+      - name: qNullableListExploded
+        in: query
+        style: form
+        explode: true
+        description: Array of `nullable`, the key repeats.
+        schema:
+          type: array
+          items:
+            type:
+            - string
+            - 'null'
+      - name: qTuple
+        in: query
+        style: form
+        explode: false
+        description: Fixed-length tuple described with `prefixItems`.
+        schema:
+          type: array
+          minItems: 2
+          maxItems: 2
+          prefixItems:
+          - type: string
+          - type: integer
+      - name: qObjectList
+        in: query
+        style: form
+        explode: true
+        description: Array of objects. Only `deepObject` can really carry this shape.
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/NestedProbe'
+      - name: qAllTypes
+        in: query
+        style: form
+        explode: false
+        description: Object `AllTypes`, flattened into one key.
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+      - name: qAllTypesExploded
+        in: query
+        style: form
+        explode: true
+        description: Object `AllTypes`, one key per property.
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+      - name: qNested
+        in: query
+        style: form
+        explode: false
+        description: Object `Nested`, flattened into one key.
+        schema:
+          $ref: '#/components/schemas/NestedProbe'
+      - name: qNestedExploded
+        in: query
+        style: form
+        explode: true
+        description: Object `Nested`, one key per property.
+        schema:
+          $ref: '#/components/schemas/NestedProbe'
+      - name: qMap
+        in: query
+        style: form
+        explode: false
+        description: Object `Map`, flattened into one key.
+        schema:
+          $ref: '#/components/schemas/MapProbe'
+      - name: qMapExploded
+        in: query
+        style: form
+        explode: true
+        description: Object `Map`, one key per property.
+        schema:
+          $ref: '#/components/schemas/MapProbe'
+      - name: qPatterned
+        in: query
+        style: form
+        explode: false
+        description: Object `Patterned`, flattened into one key.
+        schema:
+          $ref: '#/components/schemas/PatternProbe'
+      - name: qPatternedExploded
+        in: query
+        style: form
+        explode: true
+        description: Object `Patterned`, one key per property.
+        schema:
+          $ref: '#/components/schemas/PatternProbe'
+      - name: qPolymorph
+        in: query
+        style: form
+        explode: false
+        description: Object `Polymorph`, flattened into one key.
+        schema:
+          $ref: '#/components/schemas/PolyProbe'
+      - name: qPolymorphExploded
+        in: query
+        style: form
+        explode: true
+        description: Object `Polymorph`, one key per property.
+        schema:
+          $ref: '#/components/schemas/PolyProbe'
+      - name: qSpaceArray
+        in: query
+        style: spaceDelimited
+        explode: false
+        description: Array with `spaceDelimited`, not exploded.
+        schema:
+          type: array
+          items:
+            type: string
+      - name: qSpaceArrayExploded
+        in: query
+        style: spaceDelimited
+        explode: true
+        description: Array with `spaceDelimited`, exploded. The delimiter disappears.
+        schema:
+          type: array
+          items:
+            type: string
+      - name: qSpaceObject
+        in: query
+        style: spaceDelimited
+        explode: false
+        description: Object with `spaceDelimited`, not exploded.
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+      - name: qPipeArray
+        in: query
+        style: pipeDelimited
+        explode: false
+        description: Array with `pipeDelimited`, not exploded.
+        schema:
+          type: array
+          items:
+            type: string
+      - name: qPipeArrayExploded
+        in: query
+        style: pipeDelimited
+        explode: true
+        description: Array with `pipeDelimited`, exploded. The delimiter disappears.
+        schema:
+          type: array
+          items:
+            type: string
+      - name: qPipeObject
+        in: query
+        style: pipeDelimited
+        explode: false
+        description: Object with `pipeDelimited`, not exploded.
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+      - name: qDeep
+        in: query
+        style: deepObject
+        explode: true
+        description: Object with `deepObject`, one bracketed key per property.
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+      - name: qDeepNested
+        in: query
+        style: deepObject
+        explode: true
+        description: Nested object with `deepObject`.
+        schema:
+          $ref: '#/components/schemas/NestedProbe'
+      - name: qEmpty
+        in: query
+        allowEmptyValue: true
+        description: '`allowEmptyValue`, so the key may appear with no value.'
+        schema:
+          type: boolean
+          default: false
+      - name: qReserved
+        in: query
+        allowReserved: true
+        description: '`allowReserved`, so reserved characters pass through unencoded.'
+        schema:
+          type: string
+      - name: qDeprecated
+        in: query
+        deprecated: true
+        description: A deprecated parameter.
+        schema:
+          type: string
+      - name: qJsonContent
+        in: query
+        description: Structured value described with `content` rather than `schema`.
         content:
           application/json:
             schema:
-              type: object
-              required:
-              - fields
-              properties:
-                fields:
-                  type: array
-                  items:
-                    type: string
-                depth:
-                  type: integer
-                  minimum: 1
-                  maximum: 5
-            examples:
-              twoFields:
-                value:
-                  fields:
-                  - id
-                  - balance
-                  depth: 2
-      - name: X-Accept-Features
+              $ref: '#/components/schemas/NestedProbe'
+      - name: qXmlContent
+        in: query
+        description: The same, but the media type is XML rather than JSON.
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/NestedProbe'
+      - name: qSingleExample
+        in: query
+        description: Carries the singular `example` field.
+        schema:
+          type: string
+        example: one-off
+      - name: qManyExamples
+        in: query
+        description: Carries the plural `examples` map.
+        schema:
+          type: string
+        examples:
+          first:
+            summary: First
+            value: alpha
+          second:
+            summary: Second
+            value: beta
+      - name: X-Probe-String
+        in: header
+        description: Scalar `String` in a header.
+        schema:
+          type: string
+          maxLength: 64
+      - name: X-Probe-Int32
+        in: header
+        description: Scalar `Int32` in a header.
+        schema:
+          type: integer
+          format: int32
+      - name: X-Probe-Boolean
+        in: header
+        description: Scalar `Boolean` in a header.
+        schema:
+          type: boolean
+          default: false
+      - name: X-Probe-Uuid
+        in: header
+        description: Scalar `Uuid` in a header.
+        schema:
+          type: string
+          format: uuid
+      - name: X-Probe-DateTime
+        in: header
+        description: Scalar `DateTime` in a header.
+        schema:
+          type: string
+          format: date-time
+      - name: X-Probe-Enum
+        in: header
+        description: Scalar `Enum` in a header.
+        schema:
+          type: string
+          enum:
+          - alpha
+          - beta
+          - gamma
+      - name: X-Probe-Array
         in: header
         style: simple
         explode: false
-        description: Array in a header. `simple` is the only style headers allow.
+        description: Array in a header, comma separated.
         schema:
           type: array
           items:
             type: string
-        examples:
-          two:
-            value:
-            - hal
-            - problem-json
-      - name: X-Trace-Options
+      - name: X-Probe-Array-Exploded
         in: header
         style: simple
         explode: true
-        description: |
-          Object in a header. Exploding turns the flat `k,v,k,v` list into `k=v` pairs.
-        schema:
-          type: object
-          properties:
-            sampled:
-              type: boolean
-            rate:
-              type: number
-              format: double
-        examples:
-          pair:
-            value:
-              sampled: true
-              rate: 0.1
-      - name: prefs
-        in: cookie
-        style: form
-        explode: true
-        description: |
-          Object in a cookie. With `explode: true` each property becomes its own
-          cookie, which is why the specification warns the behaviour is not fully
-          defined for cookies.
-        schema:
-          type: object
-          properties:
-            theme:
-              type: string
-            density:
-              type: string
-        examples:
-          pair:
-            value:
-              theme: dark
-              density: compact
-      - name: session_flags
-        in: cookie
-        style: form
-        explode: false
-        description: Array in a cookie, comma separated inside one cookie value.
+        description: Array in a header, exploded. Identical output for arrays.
         schema:
           type: array
           items:
             type: string
-        examples:
-          two:
-            value:
-            - beta
-            - internal
-      responses:
-        '200':
-          description: |
-            What the server parsed. Each entry reports the raw value as it arrived and the value after the
-            declared style was applied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DiagnosticEcho'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        default:
-          $ref: '#/components/responses/Problem'
-  /diagnostics/path/{simpleObject}/{labelArray}/{matrixArray}:
-    get:
-      operationId: echoPathStyles
-      tags:
-      - diagnostics
-      summary: Echo the path serialization styles
-      description: |
-        The three path-capable styles with the `explode` values the rest of this
-        description does not already use. Together with
-        `GET /branches/{branchId}/atms/{coords}` every path style and `explode`
-        combination is covered.
-
-        A request looks like
-        `/diagnostics/path/kind=card,id=42/.eu.lon.01/;matrixArray=1,2,3`.
-      security:
-      - oauth2Password:
-        - accounts:read
-      parameters:
+      - name: X-Probe-Object
+        in: header
+        style: simple
+        explode: false
+        description: Object in a header as a flat `k,v,k,v` list.
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+      - name: X-Probe-Object-Exploded
+        in: header
+        style: simple
+        explode: true
+        description: Object in a header as `k=v` pairs.
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+      - name: X-Probe-Object-List
+        in: header
+        style: simple
+        explode: false
+        description: Array of objects in a header.
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/NestedProbe'
+      - name: X-Probe-Deprecated
+        in: header
+        deprecated: true
+        description: A deprecated header parameter.
+        schema:
+          type: string
+      - name: probe_string
+        in: cookie
+        description: Scalar `String` in a cookie.
+        schema:
+          type: string
+          maxLength: 64
+      - name: probe_int32
+        in: cookie
+        description: Scalar `Int32` in a cookie.
+        schema:
+          type: integer
+          format: int32
+      - name: probe_boolean
+        in: cookie
+        description: Scalar `Boolean` in a cookie.
+        schema:
+          type: boolean
+          default: false
+      - name: probe_uuid
+        in: cookie
+        description: Scalar `Uuid` in a cookie.
+        schema:
+          type: string
+          format: uuid
+      - name: probe_array
+        in: cookie
+        style: form
+        explode: false
+        description: Array in one cookie value, comma separated.
+        schema:
+          type: array
+          items:
+            type: string
+      - name: probe_array_exploded
+        in: cookie
+        style: form
+        explode: true
+        description: Array exploded across several cookies.
+        schema:
+          type: array
+          items:
+            type: string
+      - name: probe_object
+        in: cookie
+        style: form
+        explode: false
+        description: Object in one cookie value.
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+      - name: probe_object_exploded
+        in: cookie
+        style: form
+        explode: true
+        description: Object exploded, one cookie per property.
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+      - name: simpleString
+        in: path
+        required: true
+        style: simple
+        description: Scalar with `simple`.
+        schema:
+          type: string
+      - name: simpleArray
+        in: path
+        required: true
+        style: simple
+        description: 'Array with `simple`, `explode: false`.'
+        schema:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        explode: false
+      - name: simpleArrayExploded
+        in: path
+        required: true
+        style: simple
+        description: 'Array with `simple`, `explode: true`.'
+        schema:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        explode: true
       - name: simpleObject
         in: path
         required: true
         style: simple
-        explode: true
-        description: Object with `simple`, exploded into `k=v` pairs.
+        description: 'Object with `simple`, `explode: false`.'
         schema:
-          type: object
-          required:
-          - kind
-          - id
-          properties:
-            kind:
-              type: string
-            id:
-              type: string
-        examples:
-          card:
-            value:
-              kind: card
-              id: '42'
+          $ref: '#/components/schemas/EveryScalar'
+        explode: false
+      - name: simpleObjectExploded
+        in: path
+        required: true
+        style: simple
+        description: 'Object with `simple`, `explode: true`.'
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+        explode: true
+      - name: labelString
+        in: path
+        required: true
+        style: label
+        description: Scalar with `label`.
+        schema:
+          type: string
       - name: labelArray
         in: path
         required: true
         style: label
-        explode: true
-        description: Array with `label`, exploded so every item gets its own dot.
+        description: 'Array with `label`, `explode: false`.'
         schema:
           type: array
           minItems: 1
           items:
             type: string
-        examples:
-          three:
-            value:
-            - eu
-            - lon
-            - '01'
-      - name: matrixArray
+        explode: false
+      - name: labelArrayExploded
         in: path
         required: true
-        style: matrix
-        explode: false
-        description: Array with `matrix`, not exploded, so the name appears once.
+        style: label
+        description: 'Array with `label`, `explode: true`.'
         schema:
           type: array
           minItems: 1
           items:
-            type: integer
-        examples:
-          three:
-            value:
-            - 1
-            - 2
-            - 3
+            type: string
+        explode: true
+      - name: labelObject
+        in: path
+        required: true
+        style: label
+        description: 'Object with `label`, `explode: false`.'
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+        explode: false
+      - name: labelObjectExploded
+        in: path
+        required: true
+        style: label
+        description: 'Object with `label`, `explode: true`.'
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+        explode: true
+      - name: matrixString
+        in: path
+        required: true
+        style: matrix
+        description: Scalar with `matrix`.
+        schema:
+          type: string
+      - name: matrixArray
+        in: path
+        required: true
+        style: matrix
+        description: 'Array with `matrix`, `explode: false`.'
+        schema:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        explode: false
+      - name: matrixArrayExploded
+        in: path
+        required: true
+        style: matrix
+        description: 'Array with `matrix`, `explode: true`.'
+        schema:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        explode: true
+      - name: matrixObject
+        in: path
+        required: true
+        style: matrix
+        description: 'Object with `matrix`, `explode: false`.'
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+        explode: false
+      - name: matrixObjectExploded
+        in: path
+        required: true
+        style: matrix
+        description: 'Object with `matrix`, `explode: true`.'
+        schema:
+          $ref: '#/components/schemas/EveryScalar'
+        explode: true
+      requestBody:
+        $ref: '#/components/requestBodies/DiagnosticPayload'
       responses:
         '200':
-          description: What the server parsed. The three values after the declared styles were applied.
+          description: What the server parsed. Each parameter and body part, raw and after the declared
+            style was applied.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DiagnosticEcho'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/DiagnosticEcho'
+            text/plain:
+              schema:
+                type: string
         '400':
           $ref: '#/components/responses/BadRequest'
-        default:
-          $ref: '#/components/responses/Problem'
-  /diagnostics/payload:
-    post:
-      operationId: postDiagnosticPayload
-      tags:
-      - diagnostics
-      summary: Accept a payload in any media type
-      description: |
-        Thirteen request media types on one operation, including a media type range
-        (`image/*`), a catch-all (`*/*`) with an empty schema, a sequential type
-        described with `itemSchema`, and `multipart/related` with per-part `encoding`.
-      security:
-      - oauth2AllFlows:
-        - diagnostics:write
-      requestBody:
-        required: true
-        description: Whatever the caller has to hand.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DiagnosticEnvelope'
-            examples:
-              minimal:
-                $ref: '#/components/examples/DiagnosticMinimal'
-              full:
-                $ref: '#/components/examples/DiagnosticFull'
-          application/vnd.api+json:
-            schema:
-              type: object
-              description: JSON:API document wrapping the same envelope.
-              required:
-              - data
-              properties:
-                data:
-                  type: object
-                  required:
-                  - type
-                  - attributes
-                  properties:
-                    type:
-                      type: string
-                      const: diagnostic
-                    id:
-                      type: string
-                    attributes:
-                      $ref: '#/components/schemas/DiagnosticEnvelope'
-          application/yaml:
-            schema:
-              $ref: '#/components/schemas/DiagnosticEnvelope'
-          application/x-ndjson:
-            schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/DiagnosticEvent'
-          text/html:
-            schema:
-              type: string
-              contentMediaType: text/html
-              description: Rendered report, stored verbatim.
-          text/markdown:
-            schema:
-              type: string
-              description: The same report as source.
-            example: |
-              # Diagnostic report
-
-              - captured: 2026-09-08T11:04:19Z
-              - severity: info
-          text/csv:
-            schema:
-              type: string
-              description: One row per event, header row required.
-            example: |
-              at,severity,message
-              2026-09-08T11:04:19Z,info,switch reachable
-          image/png:
-            schema:
-              type: string
-              contentMediaType: image/png
-              description: Screenshot from the terminal.
-          image/*:
-            schema:
-              type: string
-              contentMediaType: image/*
-              description: |
-                A media type range. Any image the terminal can produce is accepted; the
-                concrete type arrives in `Content-Type`.
-          application/zip:
-            schema:
-              type: string
-              contentMediaType: application/zip
-              description: Archive of several reports.
-          application/cbor:
-            schema:
-              type: string
-              contentMediaType: application/cbor
-              description: The envelope, encoded as CBOR.
-          multipart/related:
-            schema:
-              type: object
-              required:
-              - report
-              properties:
-                report:
-                  $ref: '#/components/schemas/DiagnosticEnvelope'
-                screenshot:
-                  type: string
-                  contentMediaType: image/png
-            encoding:
-              report:
-                contentType: application/json
-              screenshot:
-                contentType: image/png
-                headers:
-                  Content-Location:
-                    schema:
-                      type: string
-                      format: uri-reference
-          '*/*':
-            schema:
-              description: Anything else. The schema constrains nothing at all.
-      responses:
-        '202':
-          description: Payload accepted. The payload is stored for 24 hours and then discarded.
-          headers:
-            Location:
-              $ref: '#/components/headers/Location'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DiagnosticEcho'
         '413':
           description: Payload too large. The hard limit is 8 MiB.
           content:
@@ -2165,7 +2572,7 @@ paths:
                       code: unsupported
                       detail: JPY is not offered on personal accounts.
         '415':
-          description: Unsupported media type. Only the types listed above are accepted.
+          description: Unsupported media type. The `Content-Type` is not one of the listed types.
           content:
             application/problem+json:
               schema:
@@ -2186,53 +2593,6 @@ paths:
                     - pointer: /currency
                       code: unsupported
                       detail: JPY is not offered on personal accounts.
-        default:
-          $ref: '#/components/responses/Problem'
-    put:
-      operationId: replaceDiagnosticPayload
-      tags:
-      - diagnostics
-      summary: Replace the stored payload
-      description: |
-        The request body is a `$ref` to `components.requestBodies`, and its examples are
-        in turn `$ref`s into `components.examples`.
-      security:
-      - digestAuth: []
-      - apiKeyHeader: []
-      requestBody:
-        $ref: '#/components/requestBodies/DiagnosticPayload'
-      responses:
-        '204':
-          description: Replaced. No body is returned.
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        default:
-          $ref: '#/components/responses/Problem'
-    patch:
-      operationId: annotateDiagnosticPayload
-      tags:
-      - diagnostics
-      summary: Annotate the stored payload
-      description: |
-        The request body is optional. `required` defaults to `false`, and it is spelled
-        out here so the rendering is unambiguous.
-      security: []
-      requestBody:
-        required: false
-        description: Omit the body to clear the annotation.
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                note:
-                  type: string
-                  maxLength: 280
-      responses:
-        '204':
-          description: Annotated. No body is returned.
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         default:
@@ -2500,8 +2860,9 @@ components:
   requestBodies:
     DiagnosticPayload:
       description: |
-        The reusable form of the diagnostics body. Referenced from an operation with
-        `$ref`, which is the only place a Request Body Object can be reused.
+        Every request media type the description knows about, on one body. Held in
+        `components.requestBodies` and reached with a `$ref`, which is the only way a
+        Request Body Object can be reused.
       required: true
       content:
         application/json:
@@ -2514,6 +2875,176 @@ components:
               $ref: '#/components/examples/DiagnosticFull'
             external:
               $ref: '#/components/examples/DiagnosticExternal'
+        application/vnd.api+json:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/merge-patch+json:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/json-patch+json:
+          schema:
+            $ref: '#/components/schemas/JsonPatchDocument'
+        application/hal+json:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/yaml:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/xml:
+          schema:
+            $ref: '#/components/schemas/CardAuthorization'
+        text/xml:
+          schema:
+            $ref: '#/components/schemas/CardAuthorization'
+        application/vnd.meridian.switch+xml;version=2:
+          schema:
+            $ref: '#/components/schemas/CardAuthorization'
+        text/plain:
+          schema:
+            type: string
+        text/markdown:
+          schema:
+            type: string
+        text/html:
+          schema:
+            type: string
+            contentMediaType: text/html
+        text/csv:
+          schema:
+            type: string
+        application/octet-stream:
+          schema:
+            type: string
+            contentMediaType: application/octet-stream
+        application/cbor:
+          schema:
+            type: string
+            contentMediaType: application/cbor
+        application/zip:
+          schema:
+            type: string
+            contentMediaType: application/zip
+        image/png:
+          schema:
+            type: string
+            contentMediaType: image/png
+        image/*:
+          schema:
+            type: string
+            contentMediaType: image/*
+        '*/*':
+          schema:
+            description: Anything else. The schema constrains nothing at all.
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+        application/ld+json:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/xhtml+xml:
+          schema:
+            type: string
+            contentMediaType: application/xhtml+xml
+        application/graphql:
+          schema:
+            type: string
+        application/pdf:
+          schema:
+            type: string
+            contentMediaType: application/pdf
+        application/gzip:
+          schema:
+            type: string
+            contentMediaType: application/gzip
+        application/wasm:
+          schema:
+            type: string
+            contentMediaType: application/wasm
+        application/x-protobuf:
+          schema:
+            type: string
+            contentMediaType: application/x-protobuf
+        message/rfc822:
+          schema:
+            type: string
+            contentMediaType: message/rfc822
+        font/woff2:
+          schema:
+            type: string
+            contentMediaType: font/woff2
+        audio/*:
+          schema:
+            type: string
+            contentMediaType: audio/*
+        video/mp4:
+          schema:
+            type: string
+            contentMediaType: video/mp4
+        application/x-ndjson:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/DiagnosticEvent'
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+          encoding:
+            anArray:
+              style: form
+              explode: true
+            anObject:
+              style: deepObject
+              explode: true
+        multipart/form-data:
+          schema:
+            type: object
+            required:
+            - report
+            properties:
+              report:
+                $ref: '#/components/schemas/DiagnosticEnvelope'
+              attachment:
+                type: string
+                contentMediaType: application/pdf
+          encoding:
+            report:
+              contentType: application/json
+            attachment:
+              contentType: application/pdf
+              headers:
+                Content-Disposition:
+                  schema:
+                    type: string
+        multipart/related:
+          schema:
+            type: object
+            properties:
+              root:
+                $ref: '#/components/schemas/DiagnosticEnvelope'
+              image:
+                type: string
+                contentMediaType: image/png
+          encoding:
+            root:
+              contentType: application/json
+            image:
+              contentType: image/png
+        multipart/mixed:
+          prefixEncoding:
+          - contentType: application/json
+          itemEncoding:
+            contentType: application/pdf
+          schema:
+            type: array
+            items:
+              type: string
+              contentMediaType: application/pdf
+        multipart/byteranges:
+          schema:
+            type: array
+            items:
+              type: string
+              contentMediaType: application/octet-stream
   examples:
     DiagnosticMinimal:
       summary: The smallest envelope the server accepts
@@ -4222,6 +4753,128 @@ components:
                 type: string
               detail:
                 type: string
+    EveryScalar:
+      title: Every scalar
+      type: object
+      description: |
+        One property per JSON Schema type, so a single object-shaped parameter carries them all
+        and every serialization style can be compared on the same data.
+      properties:
+        aString:
+          type: string
+        anInteger:
+          type: integer
+          format: int32
+        aNumber:
+          type: number
+          format: double
+        aBoolean:
+          type: boolean
+        aNull:
+          type:
+          - string
+          - 'null'
+        anEnum:
+          type: string
+          enum:
+          - alpha
+          - beta
+          - gamma
+        aUuid:
+          type: string
+          format: uuid
+        aDate:
+          type: string
+          format: date
+        anArray:
+          type: array
+          items:
+            type: string
+        anObject:
+          type: object
+          properties:
+            depth:
+              type: integer
+            label:
+              type: string
+    NestedProbe:
+      title: Nested probe
+      type: object
+      description: Three levels deep, to see how far a renderer expands a parameter object.
+      required:
+      - outer
+      properties:
+        outer:
+          type: string
+        inner:
+          type: object
+          properties:
+            depth:
+              type: integer
+              format: int32
+            label:
+              type: string
+            deeper:
+              type: object
+              properties:
+                leaf:
+                  type: boolean
+    MapProbe:
+      title: Map probe
+      type: object
+      description: Free-form map. Every value is a string; the keys are not declared.
+      additionalProperties:
+        type: string
+    PatternProbe:
+      title: Pattern probe
+      type: object
+      description: Keys are constrained by `patternProperties` and `propertyNames`.
+      patternProperties:
+        ^x_[a-z]+$:
+          type: integer
+          format: int32
+      propertyNames:
+        pattern: ^x_[a-z]+$
+      additionalProperties: false
+    PolyProbe:
+      title: Polymorphic probe
+      description: A discriminated union used as a parameter value rather than a body.
+      oneOf:
+      - $ref: '#/components/schemas/CircleProbe'
+      - $ref: '#/components/schemas/SquareProbe'
+      discriminator:
+        propertyName: kind
+        mapping:
+          circle: '#/components/schemas/CircleProbe'
+          square: '#/components/schemas/SquareProbe'
+    CircleProbe:
+      title: Circle probe
+      type: object
+      required:
+      - kind
+      - radius
+      properties:
+        kind:
+          type: string
+          const: circle
+        radius:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+    SquareProbe:
+      title: Square probe
+      type: object
+      required:
+      - kind
+      - side
+      properties:
+        kind:
+          type: string
+          const: square
+        side:
+          type: number
+          format: double
+          exclusiveMinimum: 0
     DiagnosticEnvelope:
       title: Diagnostic envelope
       type: object

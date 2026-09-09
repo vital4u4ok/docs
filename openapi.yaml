@@ -1,7 +1,6 @@
 openapi: 3.2.0
 $self: https://raw.githubusercontent.com/vital4u4ok/openapi-showcase/main/openapi.yaml
 jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
-
 info:
   title: Meridian Bank API
   summary: Accounts, transactions, payments and cards for the Meridian core banking platform.
@@ -11,8 +10,8 @@ info:
 
     ## What is covered
 
-    - Every security scheme type: `oauth2` (all five flows, including `password` and the
-      3.2 `deviceAuthorization` flow, and one scheme that declares all five at once),
+    - Every security scheme type: `oauth2` (`authorizationCode`, `clientCredentials`,
+      `implicit` and `password`, and one scheme that declares all four at once),
       `http` (`basic`, `bearer`, `digest`, `signature`), `apiKey` (header, query, cookie),
       `mutualTLS` and `openIdConnect`.
     - Security requirement combinations: global default, per-operation override,
@@ -27,8 +26,8 @@ info:
     - OpenAPI 3.2 additions: `$self`, `Server.name`, tag hierarchies (`parent`, `kind`,
       `summary`), the `query` HTTP method, `additionalOperations`, `in: querystring`,
       `Response.summary`, `itemSchema` / `prefixEncoding` / `itemEncoding`,
-      `Discriminator.defaultMapping`, `Example.dataValue` / `serializedValue`,
-      `components.mediaTypes` and `XML.nodeType`.
+      `Discriminator.defaultMapping`, `Example.dataValue` / `serializedValue`
+      and `XML.nodeType`.
     - JSON Schema 2020-12: `oneOf` / `anyOf` / `allOf` / `not`, `if` / `then` / `else`,
       `const`, `enum`, `dependentRequired`, `patternProperties`, `propertyNames`,
       `prefixItems`, `contains` / `minContains`, `unevaluatedProperties`,
@@ -44,11 +43,9 @@ info:
   license:
     name: Apache License 2.0
     identifier: Apache-2.0
-
 externalDocs:
   description: Developer portal
   url: https://developers.meridian.example.com/guides
-
 servers:
   - name: production
     url: https://{tenant}.api.meridian.example.com/v2
@@ -70,7 +67,6 @@ servers:
     variables:
       port:
         default: '8080'
-
 tags:
   - name: banking
     summary: Banking
@@ -116,18 +112,16 @@ tags:
   - name: diagnostics
     summary: Diagnostics
     description: |
-      Endpoints that exist to exercise this description rather than to move money.
-      Every parameter style, media type and security scheme that the rest of the API
-      does not already use is reachable from here.
+      A single operation that exists to exercise this description rather than to move
+      money. Every security scheme, request media type, parameter location, style,
+      `explode` value and data type the specification allows is reachable from it.
   - name: sunset
     summary: Deprecated
     kind: badge
     description: Scheduled for removal. Migrate before the sunset date.
-
 security:
   - oauth2AuthCode:
-      - 'accounts:read'
-
+      - accounts:read
 paths:
   /accounts:
     summary: Account collection
@@ -142,9 +136,9 @@ paths:
         prefer it over constructing cursors by hand.
       security:
         - oauth2AuthCode:
-            - 'accounts:read'
+            - accounts:read
         - oauth2Implicit:
-            - 'accounts:read'
+            - accounts:read
         - bearerJwt: []
         - apiKeyHeader: []
       parameters:
@@ -193,7 +187,7 @@ paths:
             type: array
             items:
               type: string
-              pattern: '^[A-Z]{2}-[0-9]{3}$'
+              pattern: ^[A-Z]{2}-[0-9]{3}$
           example:
             - CU-100
             - SV-220
@@ -319,7 +313,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/TooManyRequests'
-        '5XX':
+        5XX:
           $ref: '#/components/responses/ServerError'
         default:
           $ref: '#/components/responses/Problem'
@@ -334,7 +328,7 @@ paths:
       security:
         - mutualTls: []
           oauth2ClientCredentials:
-            - 'accounts:write'
+            - accounts:write
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/RequestId'
@@ -401,7 +395,6 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Problem'
-
   /accounts/{accountId}:
     parameters:
       - $ref: '#/components/parameters/AccountId'
@@ -413,7 +406,7 @@ paths:
       summary: Fetch an account
       security:
         - oauth2AuthCode:
-            - 'accounts:read'
+            - accounts:read
         - openId: []
         - apiKeyCookie: []
       parameters:
@@ -472,7 +465,7 @@ paths:
         pointer operations.
       security:
         - oauth2AuthCode:
-            - 'accounts:write'
+            - accounts:write
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - name: If-Match
@@ -517,7 +510,24 @@ paths:
           description: The `If-Match` value no longer matches the stored `ETag`.
           content:
             application/problem+json:
-              $ref: '#/components/mediaTypes/Problem'
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                      - pointer: /holder/dateOfBirth
+                        code: min_age
+                        detail: The account holder must be at least 18 years old.
+                      - pointer: /currency
+                        code: unsupported
+                        detail: JPY is not offered on personal accounts.
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         default:
@@ -535,7 +545,7 @@ paths:
       security:
         - mutualTls: []
           oauth2AuthCode:
-            - 'accounts:write'
+            - accounts:write
       responses:
         '204':
           summary: Closed
@@ -552,7 +562,24 @@ paths:
           description: A legal hold prevents closure.
           content:
             application/problem+json:
-              $ref: '#/components/mediaTypes/Problem'
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                      - pointer: /holder/dateOfBirth
+                        code: min_age
+                        detail: The account holder must be at least 18 years old.
+                      - pointer: /currency
+                        code: unsupported
+                        detail: JPY is not offered on personal accounts.
         default:
           $ref: '#/components/responses/Problem'
     query:
@@ -568,7 +595,7 @@ paths:
         for a URL does not have to be smuggled through `POST`.
       security:
         - oauth2AuthCode:
-            - 'transactions:read'
+            - transactions:read
       requestBody:
         required: true
         content:
@@ -587,7 +614,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         default:
           $ref: '#/components/responses/Problem'
-
   /accounts/{accountId}/transactions:
     parameters:
       - $ref: '#/components/parameters/AccountId'
@@ -598,7 +624,7 @@ paths:
       summary: List transactions
       security:
         - oauth2AuthCode:
-            - 'transactions:read'
+            - transactions:read
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/PageSize'
@@ -659,7 +685,7 @@ paths:
       security:
         - httpSignature: []
           oauth2AuthCode:
-            - 'payments:write'
+            - payments:write
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -690,7 +716,7 @@ paths:
                     currency: GBP
                   creditor:
                     name: Grace Hopper
-                    sortCode: '60-16-13'
+                    sortCode: 60-16-13
                     accountNumber: '31926819'
       responses:
         '201':
@@ -708,14 +734,30 @@ paths:
           description: The available balance, including any overdraft, cannot cover the debit.
           content:
             application/problem+json:
-              $ref: '#/components/mediaTypes/Problem'
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                      - pointer: /holder/dateOfBirth
+                        code: min_age
+                        detail: The account holder must be at least 18 years old.
+                      - pointer: /currency
+                        code: unsupported
+                        detail: JPY is not offered on personal accounts.
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
           $ref: '#/components/responses/Problem'
-
   /accounts/{accountId}/transactions/export:
     parameters:
       - $ref: '#/components/parameters/AccountId'
@@ -731,7 +773,7 @@ paths:
         is not one JSON document.
       security:
         - oauth2AuthCode:
-            - 'transactions:read'
+            - transactions:read
       parameters:
         - name: bookedFrom
           in: query
@@ -764,7 +806,6 @@ paths:
           $ref: '#/components/responses/Forbidden'
         default:
           $ref: '#/components/responses/Problem'
-
   /events:
     get:
       operationId: streamEvents
@@ -801,7 +842,9 @@ paths:
       responses:
         '200':
           summary: An open event stream
-          description: Stays open until the client disconnects. A comment line is sent every 15 seconds as a keep-alive.
+          description:
+            Stays open until the client disconnects. A comment line is sent every 15 seconds
+            as a keep-alive.
           content:
             text/event-stream:
               itemSchema:
@@ -810,7 +853,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         default:
           $ref: '#/components/responses/Problem'
-
   /payments/{paymentId}:
     parameters:
       - name: paymentId
@@ -827,7 +869,7 @@ paths:
       summary: Fetch a payment
       security:
         - oauth2AuthCode:
-            - 'payments:read'
+            - payments:read
       responses:
         '200':
           summary: The payment
@@ -852,7 +894,7 @@ paths:
           `additionalOperations` map because it is not one of the fixed method fields.
         security:
           - oauth2AuthCode:
-              - 'payments:write'
+              - payments:write
         requestBody:
           required: true
           content:
@@ -895,7 +937,7 @@ paths:
         summary: Release a hold
         security:
           - oauth2AuthCode:
-              - 'payments:write'
+              - payments:write
         parameters:
           - name: Lock-Token
             in: header
@@ -911,7 +953,6 @@ paths:
             $ref: '#/components/responses/NotFound'
           default:
             $ref: '#/components/responses/Problem'
-
   /reports/balances:
     get:
       operationId: getBalanceReport
@@ -926,7 +967,7 @@ paths:
         with any `in: query` parameter in the same operation.
       security:
         - oauth2AuthCode:
-            - 'accounts:read'
+            - accounts:read
       parameters:
         - $ref: '#/components/parameters/RequestId'
         - name: query
@@ -982,7 +1023,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         default:
           $ref: '#/components/responses/Problem'
-
   /documents:
     post:
       operationId: uploadDocument
@@ -992,7 +1032,7 @@ paths:
       description: Multipart upload with per-part encoding declared through `encoding`.
       security:
         - oauth2AuthCode:
-            - 'documents:write'
+            - documents:write
         - apiKeyHeader: []
       requestBody:
         required: true
@@ -1022,7 +1062,7 @@ paths:
                     description: SHA-256 of the part body, hex encoded.
                     schema:
                       type: string
-                      pattern: '^[0-9a-f]{64}$'
+                      pattern: ^[0-9a-f]{64}$
               file:
                 contentType: application/pdf
                 headers:
@@ -1050,16 +1090,49 @@ paths:
           description: The hard limit is 20 MiB per part.
           content:
             application/problem+json:
-              $ref: '#/components/mediaTypes/Problem'
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                      - pointer: /holder/dateOfBirth
+                        code: min_age
+                        detail: The account holder must be at least 18 years old.
+                      - pointer: /currency
+                        code: unsupported
+                        detail: JPY is not offered on personal accounts.
         '415':
           summary: Unsupported media type
           description: The part's `Content-Type` is not accepted for this document kind.
           content:
             application/problem+json:
-              $ref: '#/components/mediaTypes/Problem'
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                      - pointer: /holder/dateOfBirth
+                        code: min_age
+                        detail: The account holder must be at least 18 years old.
+                      - pointer: /currency
+                        code: unsupported
+                        detail: JPY is not offered on personal accounts.
         default:
           $ref: '#/components/responses/Problem'
-
   /documents/batch:
     post:
       operationId: uploadDocumentBatch
@@ -1073,7 +1146,7 @@ paths:
         `itemEncoding` for the repeated tail. `encoding` must not be used alongside them.
       security:
         - oauth2AuthCode:
-            - 'documents:write'
+            - documents:write
       requestBody:
         required: true
         content:
@@ -1110,7 +1183,6 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Problem'
-
   /cards/{cardId}:
     parameters:
       - name: cardId
@@ -1130,9 +1202,7 @@ paths:
         `wrapped` booleans.
       security:
         - oauth2AuthCode:
-            - 'cards:read'
-        - oauth2Device:
-            - 'cards:read'
+            - cards:read
         - basicAuth: []
       responses:
         '200':
@@ -1171,7 +1241,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-
   /cards/{cardId}/authorizations:
     parameters:
       - name: cardId
@@ -1195,7 +1264,7 @@ paths:
       security:
         - mutualTls: []
           oauth2ClientCredentials:
-            - 'cards:write'
+            - cards:write
         - basicAuth: []
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -1237,10 +1306,10 @@ paths:
                       line1: 12 Wilton Avenue
                       city: Milton Keynes
                       postcode: MK3 6EB
-                  terminalNote: 'Tap & go; printed receipt declined'
+                  terminalNote: Tap & go; printed receipt declined
                   emvTags:
-                    - '9F02:000000004250'
-                    - '9F36:00A4'
+                    - 9F02:000000004250
+                    - 9F36:00A4
                   riskFlags:
                     - velocity
                   cryptogram: 3q2+7wAAAAA=
@@ -1397,7 +1466,7 @@ paths:
                   dataValue:
                     messageId: 3f2a9c14-6d0b-4f5e-9c2a-77b1e0d4a913
                     decision: declined
-                    declineReason: 'Insufficient funds; available 12.06 GBP'
+                    declineReason: Insufficient funds; available 12.06 GBP
                     availableBalance:
                       value: '12.06'
                       currency: GBP
@@ -1420,12 +1489,28 @@ paths:
           description: The body was neither `application/xml` nor `application/json`.
           content:
             application/problem+json:
-              $ref: '#/components/mediaTypes/Problem'
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                      - pointer: /holder/dateOfBirth
+                        code: min_age
+                        detail: The account holder must be at least 18 years old.
+                      - pointer: /currency
+                        code: unsupported
+                        detail: JPY is not offered on personal accounts.
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Problem'
-
   /switch/messages:
     post:
       operationId: postSwitchMessage
@@ -1490,7 +1575,7 @@ paths:
                       <sw:country>GB</sw:country>
                     </merchant>
                   </sw:authorization>
-          'application/vnd.meridian.switch+xml;version=2':
+          application/vnd.meridian.switch+xml;version=2:
             schema:
               $ref: '#/components/schemas/CardAuthorization'
           application/json:
@@ -1516,7 +1601,7 @@ paths:
                   format: uuid
                 amount:
                   type: string
-                  pattern: '^-?[0-9]{1,15}\.[0-9]{2}$'
+                  pattern: ^-?[0-9]{1,15}\.[0-9]{2}$
                 currency:
                   $ref: '#/components/schemas/CurrencyCode'
                 cardPresent:
@@ -1555,7 +1640,7 @@ paths:
             schema:
               type: string
               maxLength: 1024
-              pattern: '^0100\|'
+              pattern: ^0100\|
               description: |
                 Pipe-delimited record, in field order: MTI, message id, card id, minor
                 units, currency, entry mode, capture timestamp, merchant id.
@@ -1594,12 +1679,28 @@ paths:
           description: The `Content-Type` is not one of the seven the switch accepts.
           content:
             application/problem+json:
-              $ref: '#/components/mediaTypes/Problem'
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                      - pointer: /holder/dateOfBirth
+                        code: min_age
+                        detail: The account holder must be at least 18 years old.
+                      - pointer: /currency
+                        code: unsupported
+                        detail: JPY is not offered on personal accounts.
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Problem'
-
   /branches/{branchId}/atms/{coords}:
     get:
       operationId: findAtms
@@ -1618,7 +1719,7 @@ paths:
           description: Branch code, serialized with a leading dot.
           schema:
             type: string
-            pattern: '^[A-Z]{2}-[A-Z]{3}-[0-9]{2}$'
+            pattern: ^[A-Z]{2}-[A-Z]{3}-[0-9]{2}$
           examples:
             london:
               dataValue: EU-LON-01
@@ -1672,7 +1773,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-
   /fx/rates:
     get:
       operationId: listFxRates
@@ -1704,7 +1804,7 @@ paths:
               schema:
                 type: object
                 propertyNames:
-                  pattern: '^[A-Z]{3}$'
+                  pattern: ^[A-Z]{3}$
                 additionalProperties:
                   type: number
                   format: double
@@ -1713,7 +1813,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         default:
           $ref: '#/components/responses/Problem'
-
   /fx/quotes:
     get:
       operationId: getFxQuote
@@ -1728,7 +1827,7 @@ paths:
           description: Currency pair in `BASE/QUOTE` form.
           schema:
             type: string
-            pattern: '^[A-Z]{3}/[A-Z]{3}$'
+            pattern: ^[A-Z]{3}/[A-Z]{3}$
           examples:
             gbpeur:
               dataValue: GBP/EUR
@@ -1737,7 +1836,7 @@ paths:
           in: query
           schema:
             type: string
-            pattern: '^[0-9]+\.[0-9]{2}$'
+            pattern: ^[0-9]+\.[0-9]{2}$
       responses:
         '200':
           summary: A firm quote, valid for 30 seconds
@@ -1750,7 +1849,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         default:
           $ref: '#/components/responses/Problem'
-
   /reference/tariffs:
     put:
       operationId: replaceTariffs
@@ -1878,572 +1976,941 @@ paths:
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Problem'
-
-  /diagnostics/echo:
-    get:
-      operationId: echoParameters
+  /diagnostics/everything/{simpleString}/{simpleArray}/{simpleArrayExploded}/{simpleObject}/{simpleObjectExploded}/{labelString}/{labelArray}/{labelArrayExploded}/{labelObject}/{labelObjectExploded}/{matrixString}/{matrixArray}/{matrixArrayExploded}/{matrixObject}/{matrixObjectExploded}:
+    post:
+      operationId: exerciseEverything
       tags:
         - diagnostics
-      summary: Echo every parameter back
+      summary: Exercise everything at once
       description: |
-        Every remaining parameter combination the specification allows, in one place:
-        `form`, `spaceDelimited`, `pipeDelimited` and `deepObject` in the query,
-        `simple` in a header, `form` in a cookie, each with both `explode` values, plus
-        `allowEmptyValue` and a parameter described with `content` instead of `schema`.
+        One operation carrying every security scheme this description defines, every request
+        media type it uses, and every parameter location, style, `explode` value and data type
+        the specification allows.
 
-        The response reports what the server parsed, so a client can check its own
-        serializer against the description.
+        It replaces the three narrower diagnostics operations that used to sit here. Nothing
+        about it is realistic; it exists so a renderer can be pushed at its limits on a single
+        page.
+
+        The one location missing is `in: querystring`, which describes the whole query string as
+        a single parameter and therefore cannot coexist with individual query parameters. It
+        lives on `GET /reports/balances` instead.
       security:
+        - oauth2AuthCode:
+            - accounts:read
+        - oauth2ClientCredentials:
+            - cards:write
+        - oauth2Implicit:
+            - accounts:read
+        - oauth2Password:
+            - accounts:read
+        - oauth2AllFlows:
+            - diagnostics:write
+        - openId: []
+        - bearerJwt: []
+        - basicAuth: []
         - digestAuth: []
+        - httpSignature: []
+        - apiKeyHeader: []
+        - apiKeyQuery: []
+        - apiKeyCookie: []
+        - mutualTls: []
+        - mutualTls: []
+          httpSignature: []
+        - mutualTls: []
+          oauth2ClientCredentials:
+            - cards:write
       parameters:
-        - name: tags
+        - name: qString
           in: query
-          style: form
-          explode: true
-          description: Array, exploded. The key repeats once per item.
+          description: Scalar `String` in the query.
           schema:
-            type: array
-            items:
-              type: string
-          examples:
-            two:
-              dataValue:
-                - retail
-                - eu
-              serializedValue: tags=retail&tags=eu
-        - name: filters
+            type: string
+            maxLength: 64
+        - name: qInt32
           in: query
-          style: form
-          explode: false
-          description: Array, not exploded. One key, comma separated.
+          description: Scalar `Int32` in the query.
           schema:
-            type: array
-            items:
-              type: string
-          examples:
-            two:
-              dataValue:
-                - open
-                - frozen
-              serializedValue: filters=open,frozen
-        - name: flat
+            type: integer
+            format: int32
+        - name: qInt64
           in: query
-          style: form
-          explode: false
-          description: Object, not exploded. Keys and values alternate in one value.
+          description: Scalar `Int64` in the query.
           schema:
-            type: object
-            properties:
-              status:
-                type: string
-              currency:
-                type: string
-          examples:
-            pair:
-              dataValue:
-                status: open
-                currency: GBP
-              serializedValue: flat=status,open,currency,GBP
-        - name: bbox
+            type: integer
+            format: int64
+        - name: qFloat
           in: query
-          style: spaceDelimited
-          explode: false
-          description: Space delimited, not exploded. The spaces are percent encoded.
+          description: Scalar `Float` in the query.
           schema:
-            type: array
-            items:
-              type: number
-              format: double
-          examples:
-            box:
-              dataValue:
-                - -0.51
-                - 51.28
-                - 0.33
-                - 51.69
-              serializedValue: bbox=-0.51%2051.28%200.33%2051.69
-        - name: bboxExploded
+            type: number
+            format: float
+        - name: qDouble
           in: query
-          style: spaceDelimited
-          explode: true
-          description: |
-            Space delimited, exploded. Exploding removes the delimiter entirely, so this
-            is indistinguishable from `form` with `explode: true`.
+          description: Scalar `Double` in the query.
           schema:
-            type: array
-            items:
-              type: number
-              format: double
-          examples:
-            box:
-              dataValue:
-                - -0.51
-                - 51.28
-              serializedValue: bboxExploded=-0.51&bboxExploded=51.28
-        - name: codes
+            type: number
+            format: double
+            exclusiveMinimum: 0
+        - name: qBoolean
           in: query
-          style: pipeDelimited
-          explode: false
-          description: Pipe delimited, not exploded.
-          schema:
-            type: array
-            items:
-              type: string
-          examples:
-            two:
-              dataValue:
-                - GB
-                - IE
-              serializedValue: codes=GB%7CIE
-        - name: codesExploded
-          in: query
-          style: pipeDelimited
-          explode: true
-          description: Pipe delimited, exploded. As above, the delimiter disappears.
-          schema:
-            type: array
-            items:
-              type: string
-          examples:
-            two:
-              dataValue:
-                - GB
-                - IE
-              serializedValue: codesExploded=GB&codesExploded=IE
-        - name: where
-          in: query
-          style: deepObject
-          explode: true
-          description: Nested object, one bracketed key per property.
-          schema:
-            type: object
-            properties:
-              status:
-                type: string
-              minBalance:
-                type: number
-                format: double
-          examples:
-            pair:
-              dataValue:
-                status: open
-                minBalance: 100
-              serializedValue: where[status]=open&where[minBalance]=100
-        - name: verbose
-          in: query
-          allowEmptyValue: true
-          description: |
-            Flag parameter. `allowEmptyValue` lets the key appear with no value at all.
-            The specification marks this field as not recommended, and it is here to be
-            rendered rather than copied.
+          description: Scalar `Boolean` in the query.
           schema:
             type: boolean
             default: false
-          examples:
-            bare:
-              dataValue: true
-              serializedValue: verbose
-        - name: selector
+        - name: qNullable
           in: query
-          description: |
-            A structured value carried in a single parameter, described with `content`
-            rather than `schema`, so the media type says how it is encoded.
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - fields
-                properties:
-                  fields:
-                    type: array
-                    items:
-                      type: string
-                  depth:
-                    type: integer
-                    minimum: 1
-                    maximum: 5
-              examples:
-                twoFields:
-                  dataValue:
-                    fields:
-                      - id
-                      - balance
-                    depth: 2
-                  serializedValue: selector=%7B%22fields%22%3A%5B%22id%22%2C%22balance%22%5D%2C%22depth%22%3A2%7D
-        - name: X-Accept-Features
-          in: header
-          style: simple
+          description: Scalar `Nullable` in the query.
+          schema:
+            type:
+              - string
+              - 'null'
+        - name: qUuid
+          in: query
+          description: Scalar `Uuid` in the query.
+          schema:
+            type: string
+            format: uuid
+        - name: qDate
+          in: query
+          description: Scalar `Date` in the query.
+          schema:
+            type: string
+            format: date
+        - name: qDateTime
+          in: query
+          description: Scalar `DateTime` in the query.
+          schema:
+            type: string
+            format: date-time
+        - name: qTime
+          in: query
+          description: Scalar `Time` in the query.
+          schema:
+            type: string
+            format: time
+        - name: qDuration
+          in: query
+          description: Scalar `Duration` in the query.
+          schema:
+            type: string
+            format: duration
+        - name: qEmail
+          in: query
+          description: Scalar `Email` in the query.
+          schema:
+            type: string
+            format: email
+        - name: qIdnEmail
+          in: query
+          description: Scalar `IdnEmail` in the query.
+          schema:
+            type: string
+            format: idn-email
+        - name: qHostname
+          in: query
+          description: Scalar `Hostname` in the query.
+          schema:
+            type: string
+            format: hostname
+        - name: qIpv4
+          in: query
+          description: Scalar `Ipv4` in the query.
+          schema:
+            type: string
+            format: ipv4
+        - name: qIpv6
+          in: query
+          description: Scalar `Ipv6` in the query.
+          schema:
+            type: string
+            format: ipv6
+        - name: qUri
+          in: query
+          description: Scalar `Uri` in the query.
+          schema:
+            type: string
+            format: uri
+        - name: qUriRef
+          in: query
+          description: Scalar `UriRef` in the query.
+          schema:
+            type: string
+            format: uri-reference
+        - name: qIri
+          in: query
+          description: Scalar `Iri` in the query.
+          schema:
+            type: string
+            format: iri
+        - name: qJsonPointer
+          in: query
+          description: Scalar `JsonPointer` in the query.
+          schema:
+            type: string
+            format: json-pointer
+        - name: qRegex
+          in: query
+          description: Scalar `Regex` in the query.
+          schema:
+            type: string
+            format: regex
+        - name: qBase64
+          in: query
+          description: Scalar `Base64` in the query.
+          schema:
+            type: string
+            contentEncoding: base64
+        - name: qPassword
+          in: query
+          description: Scalar `Password` in the query.
+          schema:
+            type: string
+            format: password
+        - name: qPattern
+          in: query
+          description: Scalar `Pattern` in the query.
+          schema:
+            type: string
+            pattern: ^[A-Z]{2}-[0-9]{4}$
+        - name: qEnum
+          in: query
+          description: Scalar `Enum` in the query.
+          schema:
+            type: string
+            enum:
+              - alpha
+              - beta
+              - gamma
+        - name: qConst
+          in: query
+          description: Scalar `Const` in the query.
+          schema:
+            type: string
+            const: fixed
+        - name: qStringList
+          in: query
+          style: form
           explode: false
-          description: Array in a header. `simple` is the only style headers allow.
+          description: Array of `string`, one key, comma separated.
           schema:
             type: array
             items:
               type: string
-          examples:
-            two:
-              dataValue:
-                - hal
-                - problem-json
-              serializedValue: hal,problem-json
-        - name: X-Trace-Options
-          in: header
-          style: simple
-          explode: true
-          description: |
-            Object in a header. Exploding turns the flat `k,v,k,v` list into `k=v` pairs.
-          schema:
-            type: object
-            properties:
-              sampled:
-                type: boolean
-              rate:
-                type: number
-                format: double
-          examples:
-            pair:
-              dataValue:
-                sampled: true
-                rate: 0.1
-              serializedValue: sampled=true,rate=0.1
-        - name: prefs
-          in: cookie
+        - name: qStringListExploded
+          in: query
           style: form
           explode: true
-          description: |
-            Object in a cookie. With `explode: true` each property becomes its own
-            cookie, which is why the specification warns the behaviour is not fully
-            defined for cookies.
-          schema:
-            type: object
-            properties:
-              theme:
-                type: string
-              density:
-                type: string
-          examples:
-            pair:
-              dataValue:
-                theme: dark
-                density: compact
-              serializedValue: theme=dark; density=compact
-        - name: session_flags
-          in: cookie
-          style: form
-          explode: false
-          description: Array in a cookie, comma separated inside one cookie value.
+          description: Array of `string`, the key repeats.
           schema:
             type: array
             items:
               type: string
-          examples:
-            two:
-              dataValue:
+        - name: qIntList
+          in: query
+          style: form
+          explode: false
+          description: Array of `int`, one key, comma separated.
+          schema:
+            type: array
+            items:
+              type: integer
+              format: int32
+        - name: qIntListExploded
+          in: query
+          style: form
+          explode: true
+          description: Array of `int`, the key repeats.
+          schema:
+            type: array
+            items:
+              type: integer
+              format: int32
+        - name: qNumberList
+          in: query
+          style: form
+          explode: false
+          description: Array of `number`, one key, comma separated.
+          schema:
+            type: array
+            items:
+              type: number
+              format: double
+        - name: qNumberListExploded
+          in: query
+          style: form
+          explode: true
+          description: Array of `number`, the key repeats.
+          schema:
+            type: array
+            items:
+              type: number
+              format: double
+        - name: qBoolList
+          in: query
+          style: form
+          explode: false
+          description: Array of `bool`, one key, comma separated.
+          schema:
+            type: array
+            items:
+              type: boolean
+        - name: qBoolListExploded
+          in: query
+          style: form
+          explode: true
+          description: Array of `bool`, the key repeats.
+          schema:
+            type: array
+            items:
+              type: boolean
+        - name: qUuidList
+          in: query
+          style: form
+          explode: false
+          description: Array of `uuid`, one key, comma separated.
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: qUuidListExploded
+          in: query
+          style: form
+          explode: true
+          description: Array of `uuid`, the key repeats.
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: qDateList
+          in: query
+          style: form
+          explode: false
+          description: Array of `date`, one key, comma separated.
+          schema:
+            type: array
+            items:
+              type: string
+              format: date
+        - name: qDateListExploded
+          in: query
+          style: form
+          explode: true
+          description: Array of `date`, the key repeats.
+          schema:
+            type: array
+            items:
+              type: string
+              format: date
+        - name: qEnumList
+          in: query
+          style: form
+          explode: false
+          description: Array of `enum`, one key, comma separated.
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - alpha
                 - beta
-                - internal
-              serializedValue: session_flags=beta,internal
-      responses:
-        '200':
-          summary: What the server parsed
-          description: |
-            Each entry reports the raw value as it arrived and the value after the
-            declared style was applied.
+                - gamma
+        - name: qEnumListExploded
+          in: query
+          style: form
+          explode: true
+          description: Array of `enum`, the key repeats.
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - alpha
+                - beta
+                - gamma
+        - name: qNullableList
+          in: query
+          style: form
+          explode: false
+          description: Array of `nullable`, one key, comma separated.
+          schema:
+            type: array
+            items:
+              type:
+                - string
+                - 'null'
+        - name: qNullableListExploded
+          in: query
+          style: form
+          explode: true
+          description: Array of `nullable`, the key repeats.
+          schema:
+            type: array
+            items:
+              type:
+                - string
+                - 'null'
+        - name: qTuple
+          in: query
+          style: form
+          explode: false
+          description: Fixed-length tuple described with `prefixItems`.
+          schema:
+            type: array
+            minItems: 2
+            maxItems: 2
+            prefixItems:
+              - type: string
+              - type: integer
+        - name: qObjectList
+          in: query
+          style: form
+          explode: true
+          description: Array of objects. Only `deepObject` can really carry this shape.
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/NestedProbe'
+        - name: qAllTypes
+          in: query
+          style: form
+          explode: false
+          description: Object `AllTypes`, flattened into one key.
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+        - name: qAllTypesExploded
+          in: query
+          style: form
+          explode: true
+          description: Object `AllTypes`, one key per property.
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+        - name: qNested
+          in: query
+          style: form
+          explode: false
+          description: Object `Nested`, flattened into one key.
+          schema:
+            $ref: '#/components/schemas/NestedProbe'
+        - name: qNestedExploded
+          in: query
+          style: form
+          explode: true
+          description: Object `Nested`, one key per property.
+          schema:
+            $ref: '#/components/schemas/NestedProbe'
+        - name: qMap
+          in: query
+          style: form
+          explode: false
+          description: Object `Map`, flattened into one key.
+          schema:
+            $ref: '#/components/schemas/MapProbe'
+        - name: qMapExploded
+          in: query
+          style: form
+          explode: true
+          description: Object `Map`, one key per property.
+          schema:
+            $ref: '#/components/schemas/MapProbe'
+        - name: qPatterned
+          in: query
+          style: form
+          explode: false
+          description: Object `Patterned`, flattened into one key.
+          schema:
+            $ref: '#/components/schemas/PatternProbe'
+        - name: qPatternedExploded
+          in: query
+          style: form
+          explode: true
+          description: Object `Patterned`, one key per property.
+          schema:
+            $ref: '#/components/schemas/PatternProbe'
+        - name: qPolymorph
+          in: query
+          style: form
+          explode: false
+          description: Object `Polymorph`, flattened into one key.
+          schema:
+            $ref: '#/components/schemas/PolyProbe'
+        - name: qPolymorphExploded
+          in: query
+          style: form
+          explode: true
+          description: Object `Polymorph`, one key per property.
+          schema:
+            $ref: '#/components/schemas/PolyProbe'
+        - name: qSpaceArray
+          in: query
+          style: spaceDelimited
+          explode: false
+          description: Array with `spaceDelimited`, not exploded.
+          schema:
+            type: array
+            items:
+              type: string
+        - name: qSpaceArrayExploded
+          in: query
+          style: spaceDelimited
+          explode: true
+          description: Array with `spaceDelimited`, exploded. The delimiter disappears.
+          schema:
+            type: array
+            items:
+              type: string
+        - name: qSpaceObject
+          in: query
+          style: spaceDelimited
+          explode: false
+          description: Object with `spaceDelimited`, not exploded.
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+        - name: qPipeArray
+          in: query
+          style: pipeDelimited
+          explode: false
+          description: Array with `pipeDelimited`, not exploded.
+          schema:
+            type: array
+            items:
+              type: string
+        - name: qPipeArrayExploded
+          in: query
+          style: pipeDelimited
+          explode: true
+          description: Array with `pipeDelimited`, exploded. The delimiter disappears.
+          schema:
+            type: array
+            items:
+              type: string
+        - name: qPipeObject
+          in: query
+          style: pipeDelimited
+          explode: false
+          description: Object with `pipeDelimited`, not exploded.
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+        - name: qDeep
+          in: query
+          style: deepObject
+          explode: true
+          description: Object with `deepObject`, one bracketed key per property.
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+        - name: qDeepNested
+          in: query
+          style: deepObject
+          explode: true
+          description: Nested object with `deepObject`.
+          schema:
+            $ref: '#/components/schemas/NestedProbe'
+        - name: qEmpty
+          in: query
+          allowEmptyValue: true
+          description: '`allowEmptyValue`, so the key may appear with no value.'
+          schema:
+            type: boolean
+            default: false
+        - name: qReserved
+          in: query
+          allowReserved: true
+          description: '`allowReserved`, so reserved characters pass through unencoded.'
+          schema:
+            type: string
+        - name: qDeprecated
+          in: query
+          deprecated: true
+          description: A deprecated parameter.
+          schema:
+            type: string
+        - name: qJsonContent
+          in: query
+          description: Structured value described with `content` rather than `schema`.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DiagnosticEcho'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        default:
-          $ref: '#/components/responses/Problem'
-
-  /diagnostics/path/{simpleObject}/{labelArray}/{matrixArray}:
-    get:
-      operationId: echoPathStyles
-      tags:
-        - diagnostics
-      summary: Echo the path serialization styles
-      description: |
-        The three path-capable styles with the `explode` values the rest of this
-        description does not already use. Together with
-        `GET /branches/{branchId}/atms/{coords}` every path style and `explode`
-        combination is covered.
-
-        A request looks like
-        `/diagnostics/path/kind=card,id=42/.eu.lon.01/;matrixArray=1,2,3`.
-      security:
-        - oauth2Password:
-            - 'accounts:read'
-      parameters:
+                $ref: '#/components/schemas/NestedProbe'
+        - name: qXmlContent
+          in: query
+          description: The same, but the media type is XML rather than JSON.
+          content:
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/NestedProbe'
+        - name: qSingleExample
+          in: query
+          description: Carries the singular `example` field.
+          schema:
+            type: string
+          example: one-off
+        - name: qManyExamples
+          in: query
+          description: Carries the plural `examples` map.
+          schema:
+            type: string
+          examples:
+            first:
+              summary: First
+              dataValue: alpha
+            second:
+              summary: Second
+              dataValue: beta
+        - name: X-Probe-String
+          in: header
+          description: Scalar `String` in a header.
+          schema:
+            type: string
+            maxLength: 64
+        - name: X-Probe-Int32
+          in: header
+          description: Scalar `Int32` in a header.
+          schema:
+            type: integer
+            format: int32
+        - name: X-Probe-Boolean
+          in: header
+          description: Scalar `Boolean` in a header.
+          schema:
+            type: boolean
+            default: false
+        - name: X-Probe-Uuid
+          in: header
+          description: Scalar `Uuid` in a header.
+          schema:
+            type: string
+            format: uuid
+        - name: X-Probe-DateTime
+          in: header
+          description: Scalar `DateTime` in a header.
+          schema:
+            type: string
+            format: date-time
+        - name: X-Probe-Enum
+          in: header
+          description: Scalar `Enum` in a header.
+          schema:
+            type: string
+            enum:
+              - alpha
+              - beta
+              - gamma
+        - name: X-Probe-Array
+          in: header
+          style: simple
+          explode: false
+          description: Array in a header, comma separated.
+          schema:
+            type: array
+            items:
+              type: string
+        - name: X-Probe-Array-Exploded
+          in: header
+          style: simple
+          explode: true
+          description: Array in a header, exploded. Identical output for arrays.
+          schema:
+            type: array
+            items:
+              type: string
+        - name: X-Probe-Object
+          in: header
+          style: simple
+          explode: false
+          description: Object in a header as a flat `k,v,k,v` list.
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+        - name: X-Probe-Object-Exploded
+          in: header
+          style: simple
+          explode: true
+          description: Object in a header as `k=v` pairs.
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+        - name: X-Probe-Object-List
+          in: header
+          style: simple
+          explode: false
+          description: Array of objects in a header.
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/NestedProbe'
+        - name: X-Probe-Deprecated
+          in: header
+          deprecated: true
+          description: A deprecated header parameter.
+          schema:
+            type: string
+        - name: probe_string
+          in: cookie
+          description: Scalar `String` in a cookie.
+          schema:
+            type: string
+            maxLength: 64
+        - name: probe_int32
+          in: cookie
+          description: Scalar `Int32` in a cookie.
+          schema:
+            type: integer
+            format: int32
+        - name: probe_boolean
+          in: cookie
+          description: Scalar `Boolean` in a cookie.
+          schema:
+            type: boolean
+            default: false
+        - name: probe_uuid
+          in: cookie
+          description: Scalar `Uuid` in a cookie.
+          schema:
+            type: string
+            format: uuid
+        - name: probe_array
+          in: cookie
+          style: form
+          explode: false
+          description: Array in one cookie value, comma separated.
+          schema:
+            type: array
+            items:
+              type: string
+        - name: probe_array_exploded
+          in: cookie
+          style: form
+          explode: true
+          description: Array exploded across several cookies.
+          schema:
+            type: array
+            items:
+              type: string
+        - name: probe_object
+          in: cookie
+          style: form
+          explode: false
+          description: Object in one cookie value.
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+        - name: probe_object_exploded
+          in: cookie
+          style: form
+          explode: true
+          description: Object exploded, one cookie per property.
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+        - name: simpleString
+          in: path
+          required: true
+          style: simple
+          description: Scalar with `simple`.
+          schema:
+            type: string
+        - name: simpleArray
+          in: path
+          required: true
+          style: simple
+          description: 'Array with `simple`, `explode: false`.'
+          schema:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          explode: false
+        - name: simpleArrayExploded
+          in: path
+          required: true
+          style: simple
+          description: 'Array with `simple`, `explode: true`.'
+          schema:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          explode: true
         - name: simpleObject
           in: path
           required: true
           style: simple
-          explode: true
-          description: Object with `simple`, exploded into `k=v` pairs.
+          description: 'Object with `simple`, `explode: false`.'
           schema:
-            type: object
-            required:
-              - kind
-              - id
-            properties:
-              kind:
-                type: string
-              id:
-                type: string
-          examples:
-            card:
-              dataValue:
-                kind: card
-                id: '42'
-              serializedValue: kind=card,id=42
+            $ref: '#/components/schemas/EveryScalar'
+          explode: false
+        - name: simpleObjectExploded
+          in: path
+          required: true
+          style: simple
+          description: 'Object with `simple`, `explode: true`.'
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+          explode: true
+        - name: labelString
+          in: path
+          required: true
+          style: label
+          description: Scalar with `label`.
+          schema:
+            type: string
         - name: labelArray
           in: path
           required: true
           style: label
-          explode: true
-          description: Array with `label`, exploded so every item gets its own dot.
+          description: 'Array with `label`, `explode: false`.'
           schema:
             type: array
             minItems: 1
             items:
               type: string
-          examples:
-            three:
-              dataValue:
-                - eu
-                - lon
-                - '01'
-              serializedValue: .eu.lon.01
+          explode: false
+        - name: labelArrayExploded
+          in: path
+          required: true
+          style: label
+          description: 'Array with `label`, `explode: true`.'
+          schema:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          explode: true
+        - name: labelObject
+          in: path
+          required: true
+          style: label
+          description: 'Object with `label`, `explode: false`.'
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+          explode: false
+        - name: labelObjectExploded
+          in: path
+          required: true
+          style: label
+          description: 'Object with `label`, `explode: true`.'
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+          explode: true
+        - name: matrixString
+          in: path
+          required: true
+          style: matrix
+          description: Scalar with `matrix`.
+          schema:
+            type: string
         - name: matrixArray
           in: path
           required: true
           style: matrix
-          explode: false
-          description: Array with `matrix`, not exploded, so the name appears once.
+          description: 'Array with `matrix`, `explode: false`.'
           schema:
             type: array
             minItems: 1
             items:
-              type: integer
-          examples:
-            three:
-              dataValue:
-                - 1
-                - 2
-                - 3
-              serializedValue: ;matrixArray=1,2,3
+              type: string
+          explode: false
+        - name: matrixArrayExploded
+          in: path
+          required: true
+          style: matrix
+          description: 'Array with `matrix`, `explode: true`.'
+          schema:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          explode: true
+        - name: matrixObject
+          in: path
+          required: true
+          style: matrix
+          description: 'Object with `matrix`, `explode: false`.'
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+          explode: false
+        - name: matrixObjectExploded
+          in: path
+          required: true
+          style: matrix
+          description: 'Object with `matrix`, `explode: true`.'
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+          explode: true
+      requestBody:
+        $ref: '#/components/requestBodies/DiagnosticPayload'
       responses:
         '200':
           summary: What the server parsed
-          description: The three values after the declared styles were applied.
+          description: Each parameter and body part, raw and after the declared style was applied.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DiagnosticEcho'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/DiagnosticEcho'
+            text/plain:
+              schema:
+                type: string
         '400':
           $ref: '#/components/responses/BadRequest'
-        default:
-          $ref: '#/components/responses/Problem'
-
-  /diagnostics/payload:
-    post:
-      operationId: postDiagnosticPayload
-      tags:
-        - diagnostics
-      summary: Accept a payload in any media type
-      description: |
-        Thirteen request media types on one operation, including a media type range
-        (`image/*`), a catch-all (`*/*`) with an empty schema, a sequential type
-        described with `itemSchema`, and `multipart/related` with per-part `encoding`.
-      security:
-        - oauth2AllFlows:
-            - 'diagnostics:write'
-      requestBody:
-        required: true
-        description: Whatever the caller has to hand.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DiagnosticEnvelope'
-            examples:
-              minimal:
-                $ref: '#/components/examples/DiagnosticMinimal'
-              full:
-                $ref: '#/components/examples/DiagnosticFull'
-          application/vnd.api+json:
-            schema:
-              type: object
-              description: JSON:API document wrapping the same envelope.
-              required:
-                - data
-              properties:
-                data:
-                  type: object
-                  required:
-                    - type
-                    - attributes
-                  properties:
-                    type:
-                      type: string
-                      const: diagnostic
-                    id:
-                      type: string
-                    attributes:
-                      $ref: '#/components/schemas/DiagnosticEnvelope'
-          application/yaml:
-            schema:
-              $ref: '#/components/schemas/DiagnosticEnvelope'
-          application/x-ndjson:
-            itemSchema:
-              $ref: '#/components/schemas/DiagnosticEvent'
-          text/html:
-            schema:
-              type: string
-              contentMediaType: text/html
-              description: Rendered report, stored verbatim.
-          text/markdown:
-            schema:
-              type: string
-              description: The same report as source.
-            example: |
-              # Diagnostic report
-
-              - captured: 2026-09-08T11:04:19Z
-              - severity: info
-          text/csv:
-            schema:
-              type: string
-              description: One row per event, header row required.
-            example: |
-              at,severity,message
-              2026-09-08T11:04:19Z,info,switch reachable
-          image/png:
-            schema:
-              type: string
-              contentMediaType: image/png
-              description: Screenshot from the terminal.
-          image/*:
-            schema:
-              type: string
-              contentMediaType: image/*
-              description: |
-                A media type range. Any image the terminal can produce is accepted; the
-                concrete type arrives in `Content-Type`.
-          application/zip:
-            schema:
-              type: string
-              contentMediaType: application/zip
-              description: Archive of several reports.
-          application/cbor:
-            schema:
-              type: string
-              contentMediaType: application/cbor
-              description: The envelope, encoded as CBOR.
-          multipart/related:
-            schema:
-              type: object
-              required:
-                - report
-              properties:
-                report:
-                  $ref: '#/components/schemas/DiagnosticEnvelope'
-                screenshot:
-                  type: string
-                  contentMediaType: image/png
-            encoding:
-              report:
-                contentType: application/json
-              screenshot:
-                contentType: image/png
-                headers:
-                  Content-Location:
-                    schema:
-                      type: string
-                      format: uri-reference
-          '*/*':
-            schema:
-              description: Anything else. The schema constrains nothing at all.
-      responses:
-        '202':
-          summary: Payload accepted
-          description: The payload is stored for 24 hours and then discarded.
-          headers:
-            Location:
-              $ref: '#/components/headers/Location'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DiagnosticEcho'
         '413':
           summary: Payload too large
           description: The hard limit is 8 MiB.
           content:
             application/problem+json:
-              $ref: '#/components/mediaTypes/Problem'
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                      - pointer: /holder/dateOfBirth
+                        code: min_age
+                        detail: The account holder must be at least 18 years old.
+                      - pointer: /currency
+                        code: unsupported
+                        detail: JPY is not offered on personal accounts.
         '415':
           summary: Unsupported media type
-          description: Only the types listed above are accepted.
+          description: The `Content-Type` is not one of the listed types.
           content:
             application/problem+json:
-              $ref: '#/components/mediaTypes/Problem'
-        default:
-          $ref: '#/components/responses/Problem'
-    put:
-      operationId: replaceDiagnosticPayload
-      tags:
-        - diagnostics
-      summary: Replace the stored payload
-      description: |
-        The request body is a `$ref` to `components.requestBodies`, and its examples are
-        in turn `$ref`s into `components.examples`.
-      security:
-        - digestAuth: []
-        - apiKeyHeader: []
-      requestBody:
-        $ref: '#/components/requestBodies/DiagnosticPayload'
-      responses:
-        '204':
-          summary: Replaced
-          description: No body is returned.
-        '404':
-          $ref: '#/components/responses/NotFound'
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                validation:
+                  summary: Field-level validation failure
+                  value:
+                    type: https://developers.meridian.example.com/problems/validation
+                    title: Request body failed validation
+                    status: 422
+                    detail: 2 fields are invalid.
+                    instance: /accounts
+                    errors:
+                      - pointer: /holder/dateOfBirth
+                        code: min_age
+                        detail: The account holder must be at least 18 years old.
+                      - pointer: /currency
+                        code: unsupported
+                        detail: JPY is not offered on personal accounts.
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         default:
           $ref: '#/components/responses/Problem'
-    patch:
-      operationId: annotateDiagnosticPayload
-      tags:
-        - diagnostics
-      summary: Annotate the stored payload
-      description: |
-        The request body is optional. `required` defaults to `false`, and it is spelled
-        out here so the rendering is unambiguous.
-      security: []
-      requestBody:
-        required: false
-        description: Omit the body to clear the annotation.
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                note:
-                  type: string
-                  maxLength: 280
-      responses:
-        '204':
-          summary: Annotated
-          description: No body is returned.
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        default:
-          $ref: '#/components/responses/Problem'
-
   /ping:
     $ref: '#/components/pathItems/Ping'
-
 components:
   securitySchemes:
     oauth2AuthCode:
@@ -2458,13 +2925,13 @@ components:
           tokenUrl: https://auth.meridian.example.com/oauth2/token
           refreshUrl: https://auth.meridian.example.com/oauth2/token
           scopes:
-            'accounts:read': Read account details and balances.
-            'accounts:write': Open, amend and close accounts.
-            'transactions:read': Read postings and export them.
-            'payments:read': Read payment instructions.
-            'payments:write': Initiate payments and manage holds.
-            'cards:read': Read card details.
-            'documents:write': Upload documents.
+            accounts:read: Read account details and balances.
+            accounts:write: Open, amend and close accounts.
+            transactions:read: Read postings and export them.
+            payments:read: Read payment instructions.
+            payments:write: Initiate payments and manage holds.
+            cards:read: Read card details.
+            documents:write: Upload documents.
     oauth2ClientCredentials:
       type: oauth2
       description: Server-to-server access for back-office integrations. No user context.
@@ -2474,21 +2941,9 @@ components:
           tokenUrl: https://auth.meridian.example.com/oauth2/token
           refreshUrl: https://auth.meridian.example.com/oauth2/token
           scopes:
-            'accounts:write': Open accounts on behalf of an onboarded partner.
-            'transactions:read': Read postings across the partner's portfolio.
-            'cards:write': Authorize and reverse card transactions.
-    oauth2Device:
-      type: oauth2
-      description: |
-        For the branch card-reader terminals, which have no browser. Added as a
-        first-class flow in OpenAPI 3.2.
-      flows:
-        deviceAuthorization:
-          deviceAuthorizationUrl: https://auth.meridian.example.com/oauth2/device_authorization
-          tokenUrl: https://auth.meridian.example.com/oauth2/token
-          refreshUrl: https://auth.meridian.example.com/oauth2/token
-          scopes:
-            'cards:read': Read card details at the terminal.
+            accounts:write: Open accounts on behalf of an onboarded partner.
+            transactions:read: Read postings across the partner's portfolio.
+            cards:write: Authorize and reverse card transactions.
     oauth2Implicit:
       type: oauth2
       deprecated: true
@@ -2500,7 +2955,7 @@ components:
           authorizationUrl: https://auth.meridian.example.com/oauth2/authorize
           refreshUrl: https://auth.meridian.example.com/oauth2/token
           scopes:
-            'accounts:read': Read account details and balances.
+            accounts:read: Read account details and balances.
     openId:
       type: openIdConnect
       description: Discovery-driven OIDC, for clients that want an id token alongside the access token.
@@ -2552,8 +3007,8 @@ components:
           tokenUrl: https://auth.meridian.example.com/oauth2/token
           refreshUrl: https://auth.meridian.example.com/oauth2/token
           scopes:
-            'accounts:read': Read account details and balances.
-            'transactions:read': Read postings and export them.
+            accounts:read: Read account details and balances.
+            transactions:read: Read postings and export them.
     oauth2AllFlows:
       type: oauth2
       description: |
@@ -2565,36 +3020,31 @@ components:
           tokenUrl: https://auth.meridian.example.com/oauth2/token
           refreshUrl: https://auth.meridian.example.com/oauth2/token
           scopes:
-            'diagnostics:write': Post diagnostic payloads.
+            diagnostics:write: Post diagnostic payloads.
         clientCredentials:
           tokenUrl: https://auth.meridian.example.com/oauth2/token
           scopes:
-            'diagnostics:write': Post diagnostic payloads.
+            diagnostics:write: Post diagnostic payloads.
         implicit:
           authorizationUrl: https://auth.meridian.example.com/oauth2/authorize
           scopes:
-            'diagnostics:write': Post diagnostic payloads.
+            diagnostics:write: Post diagnostic payloads.
         password:
           tokenUrl: https://auth.meridian.example.com/oauth2/token
           scopes:
-            'diagnostics:write': Post diagnostic payloads.
-        deviceAuthorization:
-          deviceAuthorizationUrl: https://auth.meridian.example.com/oauth2/device_authorization
-          tokenUrl: https://auth.meridian.example.com/oauth2/token
-          scopes:
-            'diagnostics:write': Post diagnostic payloads.
+            diagnostics:write: Post diagnostic payloads.
     digestAuth:
       type: http
       scheme: digest
       description: |
         RFC 7616 digest access authentication, still spoken by the branch back-office
         terminals. The challenge arrives in `WWW-Authenticate`.
-
   requestBodies:
     DiagnosticPayload:
       description: |
-        The reusable form of the diagnostics body. Referenced from an operation with
-        `$ref`, which is the only place a Request Body Object can be reused.
+        Every request media type the description knows about, on one body. Held in
+        `components.requestBodies` and reached with a `$ref`, which is the only way a
+        Request Body Object can be reused.
       required: true
       content:
         application/json:
@@ -2607,7 +3057,170 @@ components:
               $ref: '#/components/examples/DiagnosticFull'
             external:
               $ref: '#/components/examples/DiagnosticExternal'
-
+        application/vnd.api+json:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/merge-patch+json:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/json-patch+json:
+          schema:
+            $ref: '#/components/schemas/JsonPatchDocument'
+        application/hal+json:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/yaml:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/xml:
+          schema:
+            $ref: '#/components/schemas/CardAuthorization'
+        text/xml:
+          schema:
+            $ref: '#/components/schemas/CardAuthorization'
+        application/vnd.meridian.switch+xml;version=2:
+          schema:
+            $ref: '#/components/schemas/CardAuthorization'
+        text/plain:
+          schema:
+            type: string
+        text/markdown:
+          schema:
+            type: string
+        text/html:
+          schema:
+            type: string
+            contentMediaType: text/html
+        text/csv:
+          schema:
+            type: string
+        application/octet-stream:
+          schema:
+            type: string
+            contentMediaType: application/octet-stream
+        application/cbor:
+          schema:
+            type: string
+            contentMediaType: application/cbor
+        application/zip:
+          schema:
+            type: string
+            contentMediaType: application/zip
+        image/png:
+          schema:
+            type: string
+            contentMediaType: image/png
+        image/*:
+          schema:
+            type: string
+            contentMediaType: image/*
+        '*/*':
+          schema:
+            description: Anything else. The schema constrains nothing at all.
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+        application/ld+json:
+          schema:
+            $ref: '#/components/schemas/DiagnosticEnvelope'
+        application/xhtml+xml:
+          schema:
+            type: string
+            contentMediaType: application/xhtml+xml
+        application/graphql:
+          schema:
+            type: string
+        application/pdf:
+          schema:
+            type: string
+            contentMediaType: application/pdf
+        application/gzip:
+          schema:
+            type: string
+            contentMediaType: application/gzip
+        application/wasm:
+          schema:
+            type: string
+            contentMediaType: application/wasm
+        application/x-protobuf:
+          schema:
+            type: string
+            contentMediaType: application/x-protobuf
+        message/rfc822:
+          schema:
+            type: string
+            contentMediaType: message/rfc822
+        font/woff2:
+          schema:
+            type: string
+            contentMediaType: font/woff2
+        audio/*:
+          schema:
+            type: string
+            contentMediaType: audio/*
+        video/mp4:
+          schema:
+            type: string
+            contentMediaType: video/mp4
+        application/x-ndjson:
+          itemSchema:
+            $ref: '#/components/schemas/DiagnosticEvent'
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/EveryScalar'
+          encoding:
+            anArray:
+              style: form
+              explode: true
+            anObject:
+              style: deepObject
+              explode: true
+        multipart/form-data:
+          schema:
+            type: object
+            required:
+              - report
+            properties:
+              report:
+                $ref: '#/components/schemas/DiagnosticEnvelope'
+              attachment:
+                type: string
+                contentMediaType: application/pdf
+          encoding:
+            report:
+              contentType: application/json
+            attachment:
+              contentType: application/pdf
+              headers:
+                Content-Disposition:
+                  schema:
+                    type: string
+        multipart/related:
+          schema:
+            type: object
+            properties:
+              root:
+                $ref: '#/components/schemas/DiagnosticEnvelope'
+              image:
+                type: string
+                contentMediaType: image/png
+          encoding:
+            root:
+              contentType: application/json
+            image:
+              contentType: image/png
+        multipart/mixed:
+          prefixEncoding:
+            - contentType: application/json
+          itemEncoding:
+            contentType: application/pdf
+          itemSchema:
+            type: string
+            contentMediaType: application/pdf
+        multipart/byteranges:
+          itemSchema:
+            type: string
+            contentMediaType: application/octet-stream
   examples:
     DiagnosticMinimal:
       summary: The smallest envelope the server accepts
@@ -2637,7 +3250,6 @@ components:
         Carries `externalValue` instead of an inline value. The two are mutually
         exclusive, so this example holds no data of its own.
       externalValue: https://developers.meridian.example.com/examples/diagnostic-full.json
-
   parameters:
     AccountId:
       name: accountId
@@ -2695,7 +3307,6 @@ components:
         default: 25
         minimum: 1
         maximum: 200
-
   headers:
     ETag:
       description: Entity tag for conditional requests.
@@ -2738,28 +3349,6 @@ components:
       schema:
         type: string
       example: Fri, 01 Jan 2027 00:00:00 GMT
-
-  mediaTypes:
-    Problem:
-      schema:
-        $ref: '#/components/schemas/Problem'
-      examples:
-        validation:
-          summary: Field-level validation failure
-          value:
-            type: https://developers.meridian.example.com/problems/validation
-            title: Request body failed validation
-            status: 422
-            detail: 2 fields are invalid.
-            instance: /accounts
-            errors:
-              - pointer: /holder/dateOfBirth
-                code: min_age
-                detail: The account holder must be at least 18 years old.
-              - pointer: /currency
-                code: unsupported
-                detail: JPY is not offered on personal accounts.
-
   responses:
     NotModified:
       summary: Not modified
@@ -2772,7 +3361,24 @@ components:
       description: Syntactically invalid, or a parameter failed its schema.
       content:
         application/problem+json:
-          $ref: '#/components/mediaTypes/Problem'
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Field-level validation failure
+              value:
+                type: https://developers.meridian.example.com/problems/validation
+                title: Request body failed validation
+                status: 422
+                detail: 2 fields are invalid.
+                instance: /accounts
+                errors:
+                  - pointer: /holder/dateOfBirth
+                    code: min_age
+                    detail: The account holder must be at least 18 years old.
+                  - pointer: /currency
+                    code: unsupported
+                    detail: JPY is not offered on personal accounts.
     Unauthorized:
       summary: Missing or invalid credentials
       description: No credentials were supplied, or the token has expired or been revoked.
@@ -2784,32 +3390,117 @@ components:
           example: Bearer realm="meridian", error="invalid_token"
       content:
         application/problem+json:
-          $ref: '#/components/mediaTypes/Problem'
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Field-level validation failure
+              value:
+                type: https://developers.meridian.example.com/problems/validation
+                title: Request body failed validation
+                status: 422
+                detail: 2 fields are invalid.
+                instance: /accounts
+                errors:
+                  - pointer: /holder/dateOfBirth
+                    code: min_age
+                    detail: The account holder must be at least 18 years old.
+                  - pointer: /currency
+                    code: unsupported
+                    detail: JPY is not offered on personal accounts.
     Forbidden:
       summary: Authenticated but not permitted
       description: The token is valid but lacks the required scope, or the tenant does not own the resource.
       content:
         application/problem+json:
-          $ref: '#/components/mediaTypes/Problem'
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Field-level validation failure
+              value:
+                type: https://developers.meridian.example.com/problems/validation
+                title: Request body failed validation
+                status: 422
+                detail: 2 fields are invalid.
+                instance: /accounts
+                errors:
+                  - pointer: /holder/dateOfBirth
+                    code: min_age
+                    detail: The account holder must be at least 18 years old.
+                  - pointer: /currency
+                    code: unsupported
+                    detail: JPY is not offered on personal accounts.
     NotFound:
       summary: No such resource
       description: The resource does not exist, or the caller's tenant cannot see it.
       content:
         application/problem+json:
-          $ref: '#/components/mediaTypes/Problem'
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Field-level validation failure
+              value:
+                type: https://developers.meridian.example.com/problems/validation
+                title: Request body failed validation
+                status: 422
+                detail: 2 fields are invalid.
+                instance: /accounts
+                errors:
+                  - pointer: /holder/dateOfBirth
+                    code: min_age
+                    detail: The account holder must be at least 18 years old.
+                  - pointer: /currency
+                    code: unsupported
+                    detail: JPY is not offered on personal accounts.
     Conflict:
       summary: Conflicting state
       description: |
         Also returned when an `Idempotency-Key` is replayed with a different body.
       content:
         application/problem+json:
-          $ref: '#/components/mediaTypes/Problem'
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Field-level validation failure
+              value:
+                type: https://developers.meridian.example.com/problems/validation
+                title: Request body failed validation
+                status: 422
+                detail: 2 fields are invalid.
+                instance: /accounts
+                errors:
+                  - pointer: /holder/dateOfBirth
+                    code: min_age
+                    detail: The account holder must be at least 18 years old.
+                  - pointer: /currency
+                    code: unsupported
+                    detail: JPY is not offered on personal accounts.
     UnprocessableEntity:
       summary: Semantically invalid
       description: The body parsed and matched the schema, but broke a business rule.
       content:
         application/problem+json:
-          $ref: '#/components/mediaTypes/Problem'
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Field-level validation failure
+              value:
+                type: https://developers.meridian.example.com/problems/validation
+                title: Request body failed validation
+                status: 422
+                detail: 2 fields are invalid.
+                instance: /accounts
+                errors:
+                  - pointer: /holder/dateOfBirth
+                    code: min_age
+                    detail: The account holder must be at least 18 years old.
+                  - pointer: /currency
+                    code: unsupported
+                    detail: JPY is not offered on personal accounts.
     TooManyRequests:
       summary: Rate limited
       description: The client exceeded its quota for the current window. Wait for the interval in `Retry-After`.
@@ -2820,20 +3511,70 @@ components:
           $ref: '#/components/headers/RateLimitRemaining'
       content:
         application/problem+json:
-          $ref: '#/components/mediaTypes/Problem'
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Field-level validation failure
+              value:
+                type: https://developers.meridian.example.com/problems/validation
+                title: Request body failed validation
+                status: 422
+                detail: 2 fields are invalid.
+                instance: /accounts
+                errors:
+                  - pointer: /holder/dateOfBirth
+                    code: min_age
+                    detail: The account holder must be at least 18 years old.
+                  - pointer: /currency
+                    code: unsupported
+                    detail: JPY is not offered on personal accounts.
     ServerError:
       summary: Something broke on our side
       description: Safe to retry with the same `Idempotency-Key`.
       content:
         application/problem+json:
-          $ref: '#/components/mediaTypes/Problem'
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Field-level validation failure
+              value:
+                type: https://developers.meridian.example.com/problems/validation
+                title: Request body failed validation
+                status: 422
+                detail: 2 fields are invalid.
+                instance: /accounts
+                errors:
+                  - pointer: /holder/dateOfBirth
+                    code: min_age
+                    detail: The account holder must be at least 18 years old.
+                  - pointer: /currency
+                    code: unsupported
+                    detail: JPY is not offered on personal accounts.
     Problem:
       summary: Unexpected error
       description: The catch-all shape for any status not described explicitly.
       content:
         application/problem+json:
-          $ref: '#/components/mediaTypes/Problem'
-
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Field-level validation failure
+              value:
+                type: https://developers.meridian.example.com/problems/validation
+                title: Request body failed validation
+                status: 422
+                detail: 2 fields are invalid.
+                instance: /accounts
+                errors:
+                  - pointer: /holder/dateOfBirth
+                    code: min_age
+                    detail: The account holder must be at least 18 years old.
+                  - pointer: /currency
+                    code: unsupported
+                    detail: JPY is not offered on personal accounts.
   pathItems:
     Ping:
       summary: Liveness probe
@@ -2861,7 +3602,6 @@ components:
             headers:
               Retry-After:
                 $ref: '#/components/headers/RetryAfter'
-
   schemas:
     CurrencyCode:
       title: Currency code
@@ -2875,7 +3615,6 @@ components:
         - PLN
         - UAH
       example: GBP
-
     Money:
       title: Money
       type: object
@@ -2887,14 +3626,13 @@ components:
       properties:
         amount:
           type: string
-          pattern: '^-?[0-9]{1,15}\.[0-9]{2}$'
+          pattern: ^-?[0-9]{1,15}\.[0-9]{2}$
           description: Signed decimal in major units, always two fractional digits.
           examples:
             - '1043.28'
             - '-42.00'
         currency:
           $ref: '#/components/schemas/CurrencyCode'
-
     AccountStatus:
       title: Account status
       type: string
@@ -2912,7 +3650,6 @@ components:
         - frozen
         - closing
         - closed
-
     TransactionType:
       title: Transaction type
       type: string
@@ -2923,7 +3660,6 @@ components:
         - interest
         - reversal
         - chargeback
-
     Person:
       title: Person
       type: object
@@ -2951,7 +3687,7 @@ components:
           type:
             - string
             - 'null'
-          pattern: '^\+[1-9][0-9]{6,14}$'
+          pattern: ^\+[1-9][0-9]{6,14}$
           description: E.164, or null when the customer has withheld it.
         role:
           type: string
@@ -2959,7 +3695,6 @@ components:
             - director
             - signatory
             - beneficial-owner
-
     Company:
       title: Company
       type: object
@@ -2973,15 +3708,14 @@ components:
           maxLength: 200
         registrationNumber:
           type: string
-          pattern: '^[A-Z]{2}-[0-9]{6,12}$'
+          pattern: ^[A-Z]{2}-[0-9]{6,12}$
         countryOfIncorporation:
           type: string
           description: ISO 3166-1 alpha-2.
-          pattern: '^[A-Z]{2}$'
+          pattern: ^[A-Z]{2}$
         website:
           type: string
           format: uri
-
     Account:
       title: Account
       type: object
@@ -3013,7 +3747,7 @@ components:
           description: Customer-chosen label. `null` when never set or cleared.
         iban:
           type: string
-          pattern: '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$'
+          pattern: ^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$
           readOnly: true
         currency:
           $ref: '#/components/schemas/CurrencyCode'
@@ -3047,18 +3781,17 @@ components:
           description: Partner-defined tags. Keys are namespaced to keep them collision-free.
           maxProperties: 20
           propertyNames:
-            pattern: '^[a-z][a-z0-9]*\.[a-z0-9-]{1,40}$'
+            pattern: ^[a-z][a-z0-9]*\.[a-z0-9-]{1,40}$
           patternProperties:
-            '^tag\.':
+            ^tag\.:
               type: string
               maxLength: 100
-            '^flag\.':
+            ^flag\.:
               type: boolean
           additionalProperties: false
       dependentRequired:
         closedAt:
           - status
-
     AccountPage:
       title: Account page
       type: object
@@ -3074,7 +3807,6 @@ components:
             - string
             - 'null'
           description: Cursor for the following page, or `null` on the last page.
-
     AccountCreate:
       title: Account creation request
       description: |
@@ -3091,7 +3823,6 @@ components:
         mapping:
           personal: '#/components/schemas/PersonalAccountCreate'
           business: '#/components/schemas/BusinessAccountCreate'
-
     AccountCreateBase:
       type: object
       required:
@@ -3109,7 +3840,6 @@ components:
           type: string
           writeOnly: true
           description: Accepted on creation, never returned.
-
     PersonalAccountCreate:
       title: Personal account
       type: object
@@ -3126,7 +3856,6 @@ components:
       allOf:
         - $ref: '#/components/schemas/AccountCreateBase'
       unevaluatedProperties: false
-
     BusinessAccountCreate:
       title: Business account
       type: object
@@ -3159,7 +3888,6 @@ components:
       allOf:
         - $ref: '#/components/schemas/AccountCreateBase'
       unevaluatedProperties: false
-
     UnclassifiedAccountCreate:
       title: Unclassified account
       description: |
@@ -3181,7 +3909,6 @@ components:
           maxLength: 2000
       allOf:
         - $ref: '#/components/schemas/AccountCreateBase'
-
     AccountMergePatch:
       title: Account merge patch
       description: |
@@ -3216,7 +3943,6 @@ components:
               - string
               - boolean
               - 'null'
-
     JsonPatchDocument:
       title: JSON Patch document
       description: RFC 6902 operation list.
@@ -3259,7 +3985,6 @@ components:
           not:
             required:
               - from
-
     Transaction:
       title: Transaction
       allOf:
@@ -3311,7 +4036,6 @@ components:
               required:
                 - reversalOf
       unevaluatedProperties: false
-
     TransactionPage:
       title: Transaction page
       type: object
@@ -3334,7 +4058,6 @@ components:
               $ref: '#/components/schemas/Money'
             credits:
               $ref: '#/components/schemas/Money'
-
     CategoryNode:
       title: Category
       description: A node in the spend-category tree. Recursive through `children`.
@@ -3345,14 +4068,13 @@ components:
       properties:
         code:
           type: string
-          pattern: '^[a-z][a-z0-9-]{1,30}$'
+          pattern: ^[a-z][a-z0-9-]{1,30}$
         label:
           type: string
         children:
           type: array
           items:
             $ref: '#/components/schemas/CategoryNode'
-
     TransferRequest:
       title: Transfer request
       description: |
@@ -3384,16 +4106,16 @@ components:
               maxLength: 140
             iban:
               type: string
-              pattern: '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$'
+              pattern: ^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$
             bic:
               type: string
-              pattern: '^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$'
+              pattern: ^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$
             sortCode:
               type: string
-              pattern: '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+              pattern: ^[0-9]{2}-[0-9]{2}-[0-9]{2}$
             accountNumber:
               type: string
-              pattern: '^[0-9]{8}$'
+              pattern: ^[0-9]{8}$
         reference:
           type: string
           maxLength: 140
@@ -3428,7 +4150,6 @@ components:
               - required:
                   - sortCode
                   - accountNumber
-
     PostingQuery:
       title: Posting query
       description: Filter DSL sent in the body of a `QUERY` request.
@@ -3498,7 +4219,6 @@ components:
               minItems: 1
               items:
                 $ref: '#/components/schemas/PostingQuery/$defs/node'
-
     Event:
       title: Event
       description: One item in the SSE stream, shaped as a CloudEvent.
@@ -3535,7 +4255,6 @@ components:
             - $ref: '#/components/schemas/Account'
             - $ref: '#/components/schemas/Transaction'
             - $ref: '#/components/schemas/Card'
-
     Payment:
       title: Payment
       type: object
@@ -3566,7 +4285,6 @@ components:
           type:
             - string
             - 'null'
-
     PaymentHold:
       title: Payment hold
       type: object
@@ -3581,7 +4299,6 @@ components:
           format: date-time
         reason:
           type: string
-
     BalanceReport:
       title: Balance report
       type: object
@@ -3608,7 +4325,6 @@ components:
                 type: integer
                 format: int64
                 minimum: 0
-
     DocumentMetadata:
       title: Document metadata
       type: object
@@ -3630,11 +4346,10 @@ components:
           format: date
         issuingCountry:
           type: string
-          pattern: '^[A-Z]{2}$'
+          pattern: ^[A-Z]{2}$
       dependentRequired:
         expiresAt:
           - issuedAt
-
     Document:
       title: Document
       type: object
@@ -3663,7 +4378,6 @@ components:
           contentEncoding: base64
           contentMediaType: image/png
           description: Small PNG preview, base64 encoded.
-
     BatchManifest:
       title: Batch manifest
       type: object
@@ -3679,7 +4393,6 @@ components:
           minimum: 1
           maximum: 50
           description: Number of file parts that follow the manifest.
-
     BatchReceipt:
       title: Batch receipt
       type: object
@@ -3702,7 +4415,6 @@ components:
                 type: integer
               reason:
                 type: string
-
     Card:
       title: Card
       type: object
@@ -3730,7 +4442,7 @@ components:
         pan:
           type: string
           description: Masked primary account number.
-          pattern: '^[0-9]{6}\*{6}[0-9]{4}$'
+          pattern: ^[0-9]{6}\*{6}[0-9]{4}$
           xml:
             nodeType: element
         holder:
@@ -3747,7 +4459,7 @@ components:
             nodeType: cdata
         expiry:
           type: string
-          pattern: '^[0-9]{2}/[0-9]{2}$'
+          pattern: ^[0-9]{2}/[0-9]{2}$
         statuses:
           type: array
           xml:
@@ -3762,7 +4474,6 @@ components:
               - stolen
             xml:
               name: status
-
     XmlMoney:
       title: Money (XML)
       type: object
@@ -3777,7 +4488,7 @@ components:
       properties:
         value:
           type: string
-          pattern: '^-?[0-9]{1,15}\.[0-9]{2}$'
+          pattern: ^-?[0-9]{1,15}\.[0-9]{2}$
           description: Signed decimal in major units, always two fractional digits.
           xml:
             nodeType: text
@@ -3792,7 +4503,6 @@ components:
             - UAH
           xml:
             nodeType: attribute
-
     XmlMerchant:
       title: Merchant (XML)
       type: object
@@ -3807,12 +4517,12 @@ components:
       properties:
         id:
           type: string
-          pattern: '^[0-9]{8,15}$'
+          pattern: ^[0-9]{8,15}$
           xml:
             nodeType: attribute
         mcc:
           type: string
-          pattern: '^[0-9]{4}$'
+          pattern: ^[0-9]{4}$
           description: Merchant category code.
           xml:
             nodeType: attribute
@@ -3823,7 +4533,7 @@ components:
             nodeType: element
         country:
           type: string
-          pattern: '^[A-Z]{2}$'
+          pattern: ^[A-Z]{2}$
           description: ISO 3166-1 alpha-2, emitted in the switch namespace.
           xml:
             nodeType: element
@@ -3842,7 +4552,6 @@ components:
               type: string
             postcode:
               type: string
-
     CardAuthorization:
       title: Card authorization
       type: object
@@ -3955,7 +4664,7 @@ components:
             name: emvTags
           items:
             type: string
-            pattern: '^[0-9A-F]{4}:[0-9A-F]+$'
+            pattern: ^[0-9A-F]{4}:[0-9A-F]+$
             xml:
               name: tag
         riskFlags:
@@ -3980,7 +4689,6 @@ components:
           description: Application cryptogram as issued by the chip.
           xml:
             nodeType: element
-
     CardAuthorizationResult:
       title: Authorization result
       type: object
@@ -4009,7 +4717,7 @@ components:
             nodeType: attribute
         authCode:
           type: string
-          pattern: '^[0-9A-Z]{6}$'
+          pattern: ^[0-9A-Z]{6}$
           description: Present only when `decision` is `approved`.
           xml:
             nodeType: element
@@ -4025,7 +4733,6 @@ components:
           format: date-time
           xml:
             nodeType: element
-
     Atm:
       title: ATM
       type: object
@@ -4066,7 +4773,6 @@ components:
           type: string
           format: ipv4
           writeOnly: true
-
     FxQuote:
       title: FX quote
       type: object
@@ -4077,7 +4783,7 @@ components:
       properties:
         pair:
           type: string
-          pattern: '^[A-Z]{3}/[A-Z]{3}$'
+          pattern: ^[A-Z]{3}/[A-Z]{3}$
         rate:
           type: number
           format: double
@@ -4088,7 +4794,6 @@ components:
         quoteId:
           type: string
           format: uuid
-
     TariffTable:
       title: Tariff table
       type: object
@@ -4125,7 +4830,6 @@ components:
             nodeType: none
           items:
             $ref: '#/components/schemas/Tariff'
-
     Tariff:
       title: Tariff
       description: One of three shapes, chosen by the `kind` attribute.
@@ -4142,7 +4846,6 @@ components:
           percentage: '#/components/schemas/PercentageTariff'
           tiered: '#/components/schemas/TieredTariff'
         defaultMapping: '#/components/schemas/FlatFeeTariff'
-
     TariffBase:
       title: Tariff (common fields)
       type: object
@@ -4153,7 +4856,7 @@ components:
       properties:
         code:
           type: string
-          pattern: '^[A-Z0-9_]{3,32}$'
+          pattern: ^[A-Z0-9_]{3,32}$
           xml:
             nodeType: attribute
         kind:
@@ -4179,7 +4882,6 @@ components:
               - business
             xml:
               name: segment
-
     FlatFeeTariff:
       title: Flat fee tariff
       allOf:
@@ -4195,7 +4897,6 @@ components:
                 nodeType: attribute
             fee:
               $ref: '#/components/schemas/XmlMoney'
-
     PercentageTariff:
       title: Percentage tariff
       allOf:
@@ -4221,7 +4922,6 @@ components:
               $ref: '#/components/schemas/XmlMoney'
             maximumFee:
               $ref: '#/components/schemas/XmlMoney'
-
     TieredTariff:
       title: Tiered tariff
       allOf:
@@ -4263,7 +4963,6 @@ components:
                       nodeType: attribute
                   fee:
                     $ref: '#/components/schemas/XmlMoney'
-
     Problem:
       title: Problem details
       description: RFC 9457 problem details, extended with a machine-readable `errors` array.
@@ -4311,7 +5010,129 @@ components:
                 type: string
               detail:
                 type: string
-
+    EveryScalar:
+      title: Every scalar
+      type: object
+      description: |
+        One property per JSON Schema type, so a single object-shaped parameter carries them all
+        and every serialization style can be compared on the same data.
+      properties:
+        aString:
+          type: string
+        anInteger:
+          type: integer
+          format: int32
+        aNumber:
+          type: number
+          format: double
+        aBoolean:
+          type: boolean
+        aNull:
+          type:
+            - string
+            - 'null'
+        anEnum:
+          type: string
+          enum:
+            - alpha
+            - beta
+            - gamma
+        aUuid:
+          type: string
+          format: uuid
+        aDate:
+          type: string
+          format: date
+        anArray:
+          type: array
+          items:
+            type: string
+        anObject:
+          type: object
+          properties:
+            depth:
+              type: integer
+            label:
+              type: string
+    NestedProbe:
+      title: Nested probe
+      type: object
+      description: Three levels deep, to see how far a renderer expands a parameter object.
+      required:
+        - outer
+      properties:
+        outer:
+          type: string
+        inner:
+          type: object
+          properties:
+            depth:
+              type: integer
+              format: int32
+            label:
+              type: string
+            deeper:
+              type: object
+              properties:
+                leaf:
+                  type: boolean
+    MapProbe:
+      title: Map probe
+      type: object
+      description: Free-form map. Every value is a string; the keys are not declared.
+      additionalProperties:
+        type: string
+    PatternProbe:
+      title: Pattern probe
+      type: object
+      description: Keys are constrained by `patternProperties` and `propertyNames`.
+      patternProperties:
+        ^x_[a-z]+$:
+          type: integer
+          format: int32
+      propertyNames:
+        pattern: ^x_[a-z]+$
+      additionalProperties: false
+    PolyProbe:
+      title: Polymorphic probe
+      description: A discriminated union used as a parameter value rather than a body.
+      oneOf:
+        - $ref: '#/components/schemas/CircleProbe'
+        - $ref: '#/components/schemas/SquareProbe'
+      discriminator:
+        propertyName: kind
+        mapping:
+          circle: '#/components/schemas/CircleProbe'
+          square: '#/components/schemas/SquareProbe'
+        defaultMapping: '#/components/schemas/CircleProbe'
+    CircleProbe:
+      title: Circle probe
+      type: object
+      required:
+        - kind
+        - radius
+      properties:
+        kind:
+          type: string
+          const: circle
+        radius:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+    SquareProbe:
+      title: Square probe
+      type: object
+      required:
+        - kind
+        - side
+      properties:
+        kind:
+          type: string
+          const: square
+        side:
+          type: number
+          format: double
+          exclusiveMinimum: 0
     DiagnosticEnvelope:
       title: Diagnostic envelope
       type: object
@@ -4346,7 +5167,6 @@ components:
           description: Free-form key-value pairs. Values are strings only.
           additionalProperties:
             type: string
-
     DiagnosticEvent:
       title: Diagnostic event
       type: object
@@ -4369,7 +5189,6 @@ components:
         message:
           type: string
           maxLength: 500
-
     DiagnosticEcho:
       title: Diagnostic echo
       type: object
