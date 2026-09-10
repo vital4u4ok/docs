@@ -3030,10 +3030,6 @@ components:
             image:
               contentType: image/png
         multipart/mixed:
-          prefixEncoding:
-          - contentType: application/json
-          itemEncoding:
-            contentType: application/pdf
           schema:
             type: array
             items:

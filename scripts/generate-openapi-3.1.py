@@ -353,6 +353,7 @@ def main():
     drop_device_flow(doc)
     fold_scheme_deprecation(doc)
     strip_keys(doc, ["defaultMapping"], only_under={"discriminator"})
+    strip_keys(doc, ["prefixEncoding", "itemEncoding"])
 
     text = yaml.dump(
         doc,
