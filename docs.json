@@ -10,7 +10,7 @@
   "favicon": "/favicon.svg",
   "api": {
     "playground": {
-      "display": "auth"
+      "display": "interactive"
     }
   },
   "navigation": {
